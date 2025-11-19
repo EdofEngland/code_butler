@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Sequence
 
@@ -17,6 +16,7 @@ from ai_clean.planners.structure import (
     plan_large_file_split,
     plan_long_function_helper,
 )
+from ai_clean.storage import save_plan as storage_save_plan
 
 PlannerFunc = Callable[[Finding, int], CleanupPlan]
 
@@ -39,7 +39,7 @@ def plan_from_finding(
         plan.id = _generate_plan_id(finding, chunk_index)
 
     if config:
-        stored_path = save_plan(plan, config)
+        stored_path = storage_save_plan(plan, plans_dir=config.plans_dir)
         plan.metadata["stored_at"] = stored_path.as_posix()
 
     return plan
@@ -111,15 +111,4 @@ def _generate_plan_id(finding: Finding, chunk_index: int) -> str:
     return base
 
 
-def save_plan(plan: CleanupPlan, config: "AiCleanConfig") -> Path:
-    """Persist the plan to .ai-clean/plans/<id>.json and return the path."""
-    if not plan.id:
-        raise PlannerError("Plan must have an id before saving.")
-    config.plans_dir.mkdir(parents=True, exist_ok=True)
-    path = config.plans_dir / f"{plan.id}.json"
-    with path.open("w", encoding="utf-8") as fh:
-        json.dump(plan.to_dict(), fh, indent=2)
-    return path
-
-
-__all__ = ["plan_from_finding", "save_plan", "PlannerError"]
+__all__ = ["plan_from_finding", "PlannerError"]

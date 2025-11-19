@@ -1,4 +1,11 @@
 ## 1. Implementation
 - [ ] 1.1 Implement annotate command to run doc analyzer with mode filtering.
+  - [ ] 1.1.1 Add CLI parser `ai-clean annotate [PATH]` with `--mode missing|weak|all` (default `missing`).
+  - [ ] 1.1.2 Invoke the doc analyzer (or filter analyzer results) to gather `missing_docstring`/`weak_docstring` findings per the mode.
 - [ ] 1.2 Provide selection UI for modules or all targets and create plans accordingly.
+  - [ ] 1.2.1 Offer `--all` to plan every finding or an interactive picker to choose specific modules/symbols.
+  - [ ] 1.2.2 Call `plan_docstring_fix` (via orchestrator) for each selection, storing the plans under `.ai-clean/plans`.
 - [ ] 1.3 Allow optional auto-apply using the same apply flow while keeping docstrings factual.
+  - [ ] 1.3.1 After each plan, prompt whether to apply immediately; call the shared apply helper when confirmed.
+  - [ ] 1.3.2 Print reminders that docstrings must remain concise/factual (reuse plan constraints in the output).
+  - [ ] 1.3.3 Add tests covering mode filtering, plan generation, and the auto-apply branch (mocking apply helper).

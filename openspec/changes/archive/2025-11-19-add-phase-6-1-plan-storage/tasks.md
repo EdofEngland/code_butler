@@ -1,0 +1,16 @@
+## 1. Implementation
+- [x] 1.1 Implement save utility writing plans to .ai-clean/plans/{plan_id}.json.
+  - [x] 1.1.1 Add `ai_clean/storage.py` exporting `save_plan(plan: CleanupPlan, *, plans_dir: Path | str | None = None) -> Path` plus a `_slugify_plan_id` helper that replaces `/\:` with `-` so filenames are filesystem-safe.
+  - [x] 1.1.2 Default `plans_dir` to `.ai-clean/plans`, ensure the directory exists (`mkdir(parents=True, exist_ok=True)`), and name files `{slug}.json` derived from the helper.
+  - [x] 1.1.3 Serialize with `plan.to_dict()` and `json.dump(..., indent=2, sort_keys=True)` so data survives without losing metadata; return the written path for logging.
+- [x] 1.2 Implement load utility that reconstructs CleanupPlans accurately.
+  - [x] 1.2.1 Add `load_plan(plan_id: str, *, plans_dir: Path | str | None = None) -> CleanupPlan` that resolves `.ai-clean/plans/{slug}.json` using the same slug rules and raises `FileNotFoundError` when absent.
+  - [x] 1.2.2 Read the JSON, validate it is a mapping, and feed it into `CleanupPlan.from_dict` to rebuild the dataclass.
+  - [x] 1.2.3 Surface clearer errors (ValueError) when required keys are missing or deserialization fails, mentioning the offending plan id/path.
+- [x] 1.3 Validate that required fields survive the round-trip.
+  - [x] 1.3.1 Add `tests/test_plan_storage.py` using a temp directory to call `save_plan` + `load_plan` and `assertEqual(plan.to_dict(), restored.to_dict())`.
+  - [x] 1.3.2 Cover edge cases: saving when directory is pre-existing, attempting to load a missing plan (assert raises), and verifying metadata fields (constraints/tests_to_run) are preserved.
+- [x] 1.4 Replace existing planner persistence with the new helpers.
+  - [x] 1.4.1 Update `ai_clean/planners/orchestrator.py` to import `save_plan` from `ai_clean.storage` and delete the duplicate saver defined in that file.
+  - [x] 1.4.2 Before saving, ensure plan IDs passed through orchestrators use the slugified filename (still exposing the original id in the plan object so other metadata remains readable).
+  - [x] 1.4.3 Add regression coverage that exercises `plan_from_finding` with a plan id containing `/` to prove it now saves successfully and records the sanitized path in `metadata["stored_at"]`.

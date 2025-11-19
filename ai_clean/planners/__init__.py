@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from ai_clean.storage import save_plan
+
 from .advanced import plan_advanced_cleanup
 from .docstrings import DOCSTRING_CONSTRAINTS, plan_docstring_fix
 from .duplicate import _chunk_occurrences, plan_duplicate_block
-from .orchestrator import PlannerError, plan_from_finding, save_plan
+from .orchestrator import PlannerError, plan_from_finding
 from .organize import plan_file_moves
 from .structure import plan_large_file_split, plan_long_function_helper
 
