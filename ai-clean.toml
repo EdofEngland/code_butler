@@ -1,0 +1,15 @@
+[spec_backend]
+type = "openspec"
+
+[executor]
+type = "codex"
+
+[review]
+type = "codex_review"
+
+[git]
+base_branch = "main"
+refactor_branch = "refactor/ai-clean"
+
+[tests]
+default_command = "pytest -q"

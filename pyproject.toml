@@ -1,3 +1,23 @@
+[build-system]
+requires = ["setuptools>=58", "wheel>=0.37"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-clean"
+version = "0.1.0"
+description = "CLI for analyzing, planning, and applying structured code cleanups."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "tomli>=1.1; python_version<'3.11'",
+]
+authors = [
+    { name = "AI Clean Maintainers" },
+]
+
+[project.scripts]
+ai-clean = "ai_clean.cli:main"
+
 [tool.black]
 line-length = 88
 target-version = ['py311']
