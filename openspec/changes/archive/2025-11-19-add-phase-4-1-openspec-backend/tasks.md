@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Build the OpenSpec backend module.
+  - [x] 1.1.1 Create `ai_clean/spec_backends/__init__.py` (if missing) and `ai_clean/spec_backends/openspec.py` defining `OpenSpecBackend`.
+  - [x] 1.1.2 Have `OpenSpecBackend` accept no arguments at construction and implement the SpecBackend protocol from `ai_clean.interfaces`.
+  - [x] 1.1.3 Export `OpenSpecBackend` via `ai_clean/spec_backends/__init__.py` so later factories can import it.
+- [x] 1.2 Convert CleanupPlans into SpecChange payloads.
+  - [x] 1.2.1 Implement `plan_to_spec(self, plan: CleanupPlan) -> SpecChange` that sets `backend_type="openspec"` and copies `plan.id`, `plan.title`, `plan.intent`, `plan.steps`, `plan.constraints`, `plan.tests_to_run`, and `plan.metadata` into the SpecChange payload dict.
+  - [x] 1.2.2 Include `plan.finding_id` and `plan.metadata` inside the payload under keys like `"finding_id"` and `"metadata"` to preserve traceability.
+  - [x] 1.2.3 Add a helper `_serialize_plan(plan)` in the module to centralize payload formatting and keep field ordering stable for all plan categories.
+- [x] 1.3 Validate inputs and raise friendly errors.
+  - [x] 1.3.1 Detect missing `plan.id` or `plan.steps` and raise `ValueError` with a descriptive message before building the SpecChange.
+  - [x] 1.3.2 Add unit-level docstrings/comments summarizing that the payload is intentionally human-readable JSON-compatible data.

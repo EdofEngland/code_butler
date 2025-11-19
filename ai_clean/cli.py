@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 from typing import Callable, Iterable, Tuple
 
+from ai_clean.analyzers.orchestrator import analyze_repo, format_location_summary
+
 CommandDef = Tuple[str, Iterable[str], str]
 
 
 COMMANDS: Tuple[CommandDef, ...] = (
-    ("analyze", ["/analyze"], "Scan a path and report findings (placeholder)."),
+    ("analyze", ["/analyze"], "Scan a path and report findings."),
     ("clean", ["/clean"], "Guided cleanup flow for structural issues (placeholder)."),
     ("annotate", ["/annotate"], "Docstring-focused improvements (placeholder)."),
     ("organize", ["/organize"], "Suggest small file movements (placeholder)."),
@@ -38,6 +40,24 @@ def _placeholder_handler(command_name: str) -> Callable[[argparse.Namespace], in
     return handler
 
 
+def _analyze_handler(args: argparse.Namespace) -> int:
+    root = args.path
+    findings = analyze_repo(root)
+    if not findings:
+        print("No findings.")
+        return 0
+
+    for finding in findings:
+        loc_summary = "; ".join(
+            format_location_summary(loc) for loc in finding.locations
+        )
+        print(
+            f"[{finding.id}] {finding.category} - {finding.description} :: "
+            f"{loc_summary}"
+        )
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     description_lines = [
         "ai-clean placeholder CLI",
@@ -55,7 +75,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     for name, aliases, help_text in COMMANDS:
         sub = subparsers.add_parser(name, aliases=list(aliases), help=help_text)
-        sub.set_defaults(func=_placeholder_handler(name))
+        if name == "analyze":
+            sub.add_argument(
+                "path", nargs="?", default=".", help="Path to analyze (default: .)"
+            )
+            sub.set_defaults(func=_analyze_handler)
+        else:
+            sub.set_defaults(func=_placeholder_handler(name))
 
     return parser
 

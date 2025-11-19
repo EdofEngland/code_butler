@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
 
+from ai_clean.spec_backends.factory import SUPPORTED_SPEC_BACKENDS
+
 try:  # Python 3.11+
     import tomllib  # type: ignore[attr-defined]
 except ModuleNotFoundError:  # pragma: no cover - Python <3.11 fallback
@@ -26,7 +28,6 @@ if tomllib is None:  # pragma: no cover - Python <3.11 fallback
         ) from exc
 
 
-SUPPORTED_SPEC_BACKENDS = {"openspec"}
 SUPPORTED_EXECUTORS = {"codex"}
 SUPPORTED_REVIEW = {"codex_review"}
 
@@ -118,7 +119,10 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     tests = TestsConfig(default_command=_require(tests_section, "default_command"))
 
     spec_backend.type = _validate_choice(
-        "spec_backend", "type", spec_backend.type, SUPPORTED_SPEC_BACKENDS
+        "spec_backend",
+        "type",
+        spec_backend.type,
+        set(SUPPORTED_SPEC_BACKENDS.keys()),
     )
     executor.type = _validate_choice(
         "executor", "type", executor.type, SUPPORTED_EXECUTORS

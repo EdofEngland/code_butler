@@ -1,0 +1,11 @@
+## 1. Implementation
+- [x] 1.1 Implement planner for `organize_candidate` findings.
+  - [x] 1.1.1 Add `ai_clean/planners/organize.py` with `plan_file_moves(finding: Finding, *, max_files: int = 4) -> CleanupPlan` and export it from `ai_clean/planners/__init__.py`.
+  - [x] 1.1.2 Use `finding.metadata["destination"]` (emitted by the analyzer) plus `locations` to build plan titles like `"Move {files} into {destination}"` and to set `metadata["target_folder"]`.
+  - [x] 1.1.3 Steps must explicitly cover: (1) create/verify destination folder, (2) move each file, (3) update package `__init__.py` or re-export stubs if needed.
+- [x] 1.2 Capture import update work.
+  - [x] 1.2.1 Append step text instructing to run a repo-wide import search/replace for the moved modules.
+  - [x] 1.2.2 Add constraints guaranteeing no function/class bodies change and requiring re-export shims for public modules; note this in plan metadata (`"requires_reexports": true/false`).
+- [x] 1.3 Keep scope tightly bounded.
+  - [x] 1.3.1 Enforce `max_files` by trimming the file list inside `plan_file_moves` and surfacing leftover files through `metadata["deferred_files"]`.
+  - [x] 1.3.2 When trimming occurs, instruct the plan (final step) to open follow-up organize tickets instead of silently dropping files.

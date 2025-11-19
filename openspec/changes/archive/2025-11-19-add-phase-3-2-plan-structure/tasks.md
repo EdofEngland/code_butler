@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Create planners for `large_file` findings.
+  - [x] 1.1.1 Add `plan_large_file_split(finding: Finding, *, max_modules: int = 3)` to `ai_clean/planners/structure.py` (create the module if missing) and export it from `ai_clean/planners/__init__.py`.
+  - [x] 1.1.2 Rely on currently available data (file path from `FindingLocation` plus `metadata["line_count"]`) to propose splits: use the path stem to suggest module names and describe steps to (1) identify 2-3 logical sections based on top-level classes/functions, (2) move each section into a new file up to `max_modules`, and (3) update imports/re-exports in the original file.
+  - [x] 1.1.3 Set constraints covering "limit new files", "preserve public API (re-export moved symbols)", and "avoid cross-package renames", and include `tests_to_run=["pytest"]`.
+- [x] 1.2 Create planners for `long_function` findings.
+  - [x] 1.2.1 Add `plan_long_function_helper(finding: Finding, *, max_helpers: int = 2)` to `ai_clean/planners/structure.py` that inspects the `finding.locations` span and `metadata["function"]`.
+  - [x] 1.2.2 Generate deterministic steps: (1) identify cohesive blocks inside the function, (2) extract helpers placed next to the function, (3) replace the original block with helper calls.
+  - [x] 1.2.3 Add constraints forbidding signature changes or cross-module moves, and record targeted helper names in `CleanupPlan.metadata`.
+- [x] 1.3 Share guardrails for shallow structures.
+  - [x] 1.3.1 Document reusable constraint strings (e.g., `KEEP_PUBLIC_API`, `LIMIT_TO_LOCAL_SCOPE`) in `structure.py` and reuse them across both planners.
+  - [x] 1.3.2 Ensure both planners cap scope by checking total touched files/lines and truncating any additional sections with an explanatory `metadata["omitted_sections"]` entry.
