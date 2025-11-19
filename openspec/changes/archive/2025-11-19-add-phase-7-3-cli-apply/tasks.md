@@ -1,0 +1,13 @@
+## 1. Implementation
+- [x] 1.1 Implement apply command to load config, enforce branch helper, and read plan.
+  - [x] 1.1.1 Add CLI parser `ai-clean apply PLAN_ID` with flags like `--skip-tests` and `--spec-dir`.
+  - [x] 1.1.2 Load `AiCleanConfig` via `load_config()`, call `ensure_on_refactor_branch(config.git.base_branch, config.git.refactor_branch)` before modifying files.
+  - [x] 1.1.3 Load the target plan JSON using `load_plan(plan_id, plans_dir=config.plans_dir)` and error if it is missing.
+- [x] 1.2 Generate spec via backend and apply via executor with tests.
+  - [x] 1.2.1 Instantiate the spec backend with `build_spec_backend(config)`; write the spec into `config.specs_dir` (or overridden path) and print the file path.
+  - [x] 1.2.2 Build the code executor via `build_code_executor(config)` and call `apply_spec(written_spec_path)`, honoring `--skip-tests` by short-circuiting test execution.
+  - [x] 1.2.3 Persist the resulting `ExecutionResult` to `.ai-clean/executions/{plan_id}.json` for later review (added helper, e.g., `save_execution_result`).
+- [x] 1.3 Report success, test status, and git diff --stat in output.
+  - [x] 1.3.1 After applying, print whether the apply succeeded, include test pass/fail info, and show stdout/stderr excerpts (possibly truncated).
+  - [x] 1.3.2 Invoke `get_diff_stat()` to show a summary of touched files; when the command fails, bubble the error so the CLI exits non-zero.
+  - [x] 1.3.3 Add unit tests (`tests/test_cli_apply.py`) that mock backend/executor/diff helpers to verify command sequencing, environment enforcement, and result persistence.

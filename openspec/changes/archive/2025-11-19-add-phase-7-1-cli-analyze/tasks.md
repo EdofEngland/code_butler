@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Wire CLI command `ai-clean analyze [PATH]` to analyzer orchestrator.
+  - [x] 1.1.1 Update `ai_clean/cli.py` to register a real handler instead of the placeholder, parsing an optional `path` argument (default `.`) plus `--categories` to filter.
+  - [x] 1.1.2 In the handler, call `analyze_repo(path)` and catch `FileNotFoundError`/`ValueError`, printing a descriptive error before returning a non-zero exit code.
+  - [x] 1.1.3 Keep the command read-only by avoiding plan/spec creation or git calls; unit-test via `tests/test_cli_analyze.py` that the handler never invokes storage helpers.
+- [x] 1.2 Format findings output with id, category, description, and locations.
+  - [x] 1.2.1 For each `Finding`, render `[id] category - description` and append location summaries joined by `; ` using `format_location_summary`.
+  - [x] 1.2.2 When `--categories` is passed, filter before printing and emit “No findings” when nothing matches.
+  - [x] 1.2.3 Unit-test that multiple locations display correctly and that empty results print the default message.
+- [x] 1.3 Ensure command is read-only and does not create plans.
+  - [x] 1.3.1 Confirm the handler only imports analyzer modules; document this in the CLI module.
+  - [x] 1.3.2 Add regression tests asserting `plan_from_finding`/`save_plan` are not called (e.g., via `unittest.mock.patch`).

@@ -27,6 +27,7 @@ def _make_config(base_dir: Path) -> AiCleanConfig:
         metadata_root=base_dir,
         plans_dir=base_dir / "plans",
         specs_dir=base_dir / "specs",
+        executions_dir=base_dir / "executions",
     )
 
 

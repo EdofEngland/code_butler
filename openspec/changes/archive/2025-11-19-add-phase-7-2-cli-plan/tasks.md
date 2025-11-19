@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Implement plan command that resolves findings and builds plans via orchestrator.
+  - [x] 1.1.1 Extend `ai_clean/cli.py` with a `plan` subparser accepting `finding_id`, optional `--path` (default `.`), and `--chunk-index`.
+  - [x] 1.1.2 Inside the handler, call `analyze_repo(path)` to locate the requested `Finding`; error out with a helpful message when the ID is missing.
+  - [x] 1.1.3 Load configuration via `load_config()`, then call `plan_from_finding(finding, chunk_index=..., config=config)` to generate and persist the plan.
+- [x] 1.2 Persist the plan and output its id, intent, steps, constraints, and tests.
+  - [x] 1.2.1 After `plan_from_finding`, print a structured summary (id/title/intent) followed by numbered steps, constraints, and tests_to_run.
+  - [x] 1.2.2 Include the stored path from `plan.metadata["stored_at"]` so users know where JSON resides.
+  - [x] 1.2.3 Add unit tests (e.g., `tests/test_cli_plan.py`) that mock `plan_from_finding` and assert the stdout contains the required fields.
+- [x] 1.3 Support optional path input while keeping command non-mutating to code.
+  - [x] 1.3.1 Ensure the handler never writes to git or calls executors; only plan metadata should change.
+  - [x] 1.3.2 When multiple findings share the same id under different paths, allow `--path` to filter analyzer results; add tests verifying ambiguous IDs trigger errors with guidance.

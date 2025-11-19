@@ -7,9 +7,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ai_clean.models import CleanupPlan
+from ai_clean.models import CleanupPlan, ExecutionResult
 
 DEFAULT_PLANS_DIR = Path(".ai-clean/plans")
+DEFAULT_EXECUTIONS_DIR = Path(".ai-clean/executions")
 _SANITIZE_TABLE = str.maketrans({"/": "-", "\\": "-", ":": "-"})
 
 
@@ -27,6 +28,14 @@ def _resolve_plans_dir(plans_dir: Path | str | None) -> Path:
         directory = DEFAULT_PLANS_DIR
     else:
         directory = Path(plans_dir)
+    return directory
+
+
+def _resolve_executions_dir(executions_dir: Path | str | None) -> Path:
+    if executions_dir is None:
+        directory = DEFAULT_EXECUTIONS_DIR
+    else:
+        directory = Path(executions_dir)
     return directory
 
 
@@ -75,4 +84,45 @@ def load_plan(
         ) from exc
 
 
-__all__ = ["save_plan", "load_plan"]
+def save_execution_result(
+    result: ExecutionResult,
+    plan_id: str,
+    *,
+    executions_dir: Path | str | None = None,
+) -> Path:
+    """Persist an execution result JSON for the provided plan id."""
+    if not plan_id:
+        raise ValueError("plan_id is required to save an execution result.")
+
+    directory = _resolve_executions_dir(executions_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    slug = _slugify_plan_id(plan_id)
+    path = directory / f"{slug}.json"
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(result.to_dict(), handle, indent=2, sort_keys=True)
+    return path
+
+
+def load_execution_result(
+    plan_id: str,
+    *,
+    executions_dir: Path | str | None = None,
+) -> ExecutionResult:
+    """Load a stored execution result for the provided plan id."""
+    if not plan_id:
+        raise ValueError("plan_id is required to load an execution result.")
+
+    directory = _resolve_executions_dir(executions_dir)
+    slug = _slugify_plan_id(plan_id)
+    path = directory / f"{slug}.json"
+    with path.open("r", encoding="utf-8") as handle:
+        payload: Any = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"Execution result file {path} does not contain a JSON object."
+        )
+    return ExecutionResult.from_dict(payload)
+
+
+__all__ = ["save_plan", "load_plan", "save_execution_result", "load_execution_result"]

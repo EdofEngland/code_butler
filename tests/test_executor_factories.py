@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from ai_clean.config import (
     AiCleanConfig,
@@ -19,6 +20,7 @@ def _config(
     executor_type: str = "codex",
     review_type: str = "codex_review",
 ) -> AiCleanConfig:
+    base_dir = Path(".")
     return AiCleanConfig(
         spec_backend=SpecBackendConfig(type="openspec"),
         executor=ExecutorConfig(
@@ -27,9 +29,10 @@ def _config(
         review=ReviewConfig(type=review_type),
         git=GitConfig(base_branch="main", refactor_branch="feature"),
         tests=TestsConfig(default_command="pytest -q"),
-        metadata_root=None,  # type: ignore[arg-type]
-        plans_dir=None,  # type: ignore[arg-type]
-        specs_dir=None,  # type: ignore[arg-type]
+        metadata_root=base_dir,
+        plans_dir=base_dir,
+        specs_dir=base_dir,
+        executions_dir=base_dir,
     )
 
 

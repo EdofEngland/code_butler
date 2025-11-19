@@ -69,6 +69,7 @@ class AiCleanConfig:
     metadata_root: Path
     plans_dir: Path
     specs_dir: Path
+    executions_dir: Path
 
 
 def _require(section: Dict[str, Any], key: str) -> str:
@@ -168,8 +169,10 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     metadata_root = Path(".ai-clean")
     plans_dir = metadata_root / "plans"
     specs_dir = metadata_root / "specs"
+    executions_dir = metadata_root / "executions"
     plans_dir.mkdir(parents=True, exist_ok=True)
     specs_dir.mkdir(parents=True, exist_ok=True)
+    executions_dir.mkdir(parents=True, exist_ok=True)
 
     return AiCleanConfig(
         spec_backend=spec_backend,
@@ -180,6 +183,7 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
         metadata_root=metadata_root,
         plans_dir=plans_dir,
         specs_dir=specs_dir,
+        executions_dir=executions_dir,
     )
 
 
