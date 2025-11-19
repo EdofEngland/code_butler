@@ -33,7 +33,7 @@ class ReviewExecutor(Protocol):
 
     def review_change(
         self,
-        plan_id: str,
+        plan: CleanupPlan,
         diff: str,
         execution_result: Union[ExecutionResult, None],
     ) -> Union[str, dict]:

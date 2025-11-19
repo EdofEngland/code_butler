@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Trigger configured tests only after successful apply.
+  - [x] 1.1.1 Update `CodexExecutor` to accept a `tests_command: list[str] | None`, defaulting to `shlex.split(config.tests.default_command)` so tests reuse the repo-wide configuration.
+  - [x] 1.1.2 Add a `_run_tests()` helper inside `ai_clean/executors/codex.py` that invokes the stored command via `subprocess.run(..., capture_output=True, text=True, check=False)`.
+  - [x] 1.1.3 Call `_run_tests()` only when the apply step succeeded (exit code `0`); skip invocation for failed apply attempts.
+- [x] 1.2 Mark tests_passed based on test command exit status and capture logs.
+  - [x] 1.2.1 Combine apply and test logs by appending prefixed sections (e.g., `"== TESTS ==\n"`) to `ExecutionResult.stdout`/`stderr`.
+  - [x] 1.2.2 Set `tests_passed=True` when the tests return code is `0`, otherwise `False`, and persist the command/return code fields in `execution_result.metadata["tests"]`.
+  - [x] 1.2.3 Ensure `_run_tests()` never raises; instead, return the captured logs/return code so the caller can include them in the final result.
+- [x] 1.3 Skip test execution when apply fails.
+  - [x] 1.3.1 When the apply command fails, immediately return an `ExecutionResult` with `tests_passed=None` and include `{"skipped": True, "reason": "apply_failed"}` in `metadata["tests"]`.
+  - [x] 1.3.2 Add unit coverage that monkeypatches `_run_tests()` to prove it is not called when apply fails and that `tests_passed` remains `None`.

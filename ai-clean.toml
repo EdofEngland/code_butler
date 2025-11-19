@@ -3,6 +3,8 @@ type = "openspec"
 
 [executor]
 type = "codex"
+# {spec_path} placeholder is replaced automatically with the absolute spec path.
+apply_command = ["bash", "-lc", "openspec apply {spec_path}"]
 
 [review]
 type = "codex_review"

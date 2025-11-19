@@ -1,0 +1,13 @@
+## 1. Implementation
+- [x] 1.1 Read executor and review settings from configuration.
+  - [x] 1.1.1 Add `ai_clean/executors/factory.py` with helpers `build_code_executor(config: AiCleanConfig) -> CodeExecutor` and `build_review_executor(config: AiCleanConfig, *, codex_completion: CodexCompletion | None = None) -> ReviewExecutor`.
+  - [x] 1.1.2 Have the factory pull `config.executor.type`, `config.executor.apply_command`, and `config.tests.default_command` to instantiate `CodexExecutor` with both apply and tests commands.
+  - [x] 1.1.3 Re-export the new helpers from `ai_clean/executors/__init__.py` so CLI code can import them from a single module.
+- [x] 1.2 Instantiate supported executors and raise errors on unsupported types.
+  - [x] 1.2.1 Maintain `SUPPORTED_CODE_EXECUTORS`/`SUPPORTED_REVIEW_EXECUTORS` dictionaries and look up constructors by their lowercase type string.
+  - [x] 1.2.2 Raise `ValueError` when the requested type is not supported, and include the allowed values in the exception message.
+  - [x] 1.2.3 Cover success/failure branches with unit tests that assert the right class is created and unsupported types produce errors.
+- [x] 1.3 Validate presence of required settings before returning instances.
+  - [x] 1.3.1 Ensure `build_code_executor` verifies the `apply_command` list is non-empty before instantiating `CodexExecutor`, adding a descriptive error otherwise.
+  - [x] 1.3.2 Require a `codex_completion` callable when building a `codex_review` review executor; raise `RuntimeError` if the dependency is missing.
+  - [x] 1.3.3 Populate factory-level docstrings/comments describing the required settings so future contributors understand the validation rules.

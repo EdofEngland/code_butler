@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from ai_clean.spec_backends.factory import SUPPORTED_SPEC_BACKENDS
 
@@ -40,6 +40,7 @@ class SpecBackendConfig:
 @dataclass
 class ExecutorConfig:
     type: str
+    apply_command: List[str]
 
 
 @dataclass
@@ -95,6 +96,34 @@ def _get_section(config: Dict[str, Any], name: str) -> Dict[str, Any]:
     return section
 
 
+def _require_command_list(
+    section: Dict[str, Any],
+    key: str,
+    *,
+    require_placeholder: bool = False,
+) -> List[str]:
+    section_name = section.get("__name__") or "unknown"
+    value = section.get(key)
+    if not isinstance(value, list) or not value:
+        raise ValueError(
+            f"Missing required list key '{key}' in [{section_name}] section"
+        )
+    command = [str(part) for part in value if str(part).strip()]
+    if not command:
+        raise ValueError(
+            (
+                f"List key '{key}' in [{section_name}] section must include at least "
+                "one item"
+            )
+        )
+    if require_placeholder and not any("{spec_path}" in part for part in command):
+        raise ValueError(
+            f"List key '{key}' in [{section_name}] must include '{{spec_path}}' so "
+            "the executor can substitute the spec path."
+        )
+    return command
+
+
 def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     path = Path(config_path)
     if not path.is_file():
@@ -110,7 +139,14 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     tests_section = _get_section(raw_cfg, "tests")
 
     spec_backend = SpecBackendConfig(type=_require(spec_backend_section, "type"))
-    executor = ExecutorConfig(type=_require(executor_section, "type"))
+    executor = ExecutorConfig(
+        type=_require(executor_section, "type"),
+        apply_command=_require_command_list(
+            executor_section,
+            "apply_command",
+            require_placeholder=True,
+        ),
+    )
     review = ReviewConfig(type=_require(review_section, "type"))
     git = GitConfig(
         base_branch=_require(git_section, "base_branch"),
