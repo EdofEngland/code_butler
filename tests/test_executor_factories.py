@@ -24,7 +24,8 @@ def _config(
     return AiCleanConfig(
         spec_backend=SpecBackendConfig(type="openspec"),
         executor=ExecutorConfig(
-            type=executor_type, apply_command=["echo", "{spec_path}"]
+            type=executor_type,
+            apply_command=["scripts/apply_spec_wrapper.py", "{spec_path}"],
         ),
         review=ReviewConfig(type=review_type),
         git=GitConfig(base_branch="main", refactor_branch="feature"),
@@ -44,6 +45,13 @@ class ExecutorFactoryTests(unittest.TestCase):
         config = _config()
         executor = build_code_executor(config)
         self.assertIsInstance(executor, CodexExecutor)
+
+    def test_configures_wrapper_command(self) -> None:
+        config = _config()
+        self.assertEqual(
+            config.executor.apply_command,
+            ["scripts/apply_spec_wrapper.py", "{spec_path}"],
+        )
 
     def test_build_code_executor_invalid_type(self) -> None:
         config = _config(executor_type="unknown")

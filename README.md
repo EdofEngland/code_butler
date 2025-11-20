@@ -36,6 +36,13 @@ If you already know the finding ID you want to fix, run `ai-clean plan <finding_
 ### Applying plans (`/apply`)
 Once a plan looks good, execute `ai-clean apply <plan_id> [--skip-tests --spec-dir DIR]`. The command enforces the configured refactor branch, writes the spec via the OpenSpec backend, runs the executor and tests, then records logs under `.ai-clean/specs/` and `.ai-clean/executions/`. Avoid running `/apply` directly on your main branch or against a plan you have not reviewed—the command assumes the stored plan is ready to execute.
 
+#### Running apply outside Codex
+By default, `ai-clean apply` invokes `scripts/apply_spec_wrapper.py`, which first tries `/prompts:openspec-apply {spec_path}` (available inside Codex) and falls back to other commands or the stub. When developing locally:
+- `AI_CLEAN_USE_APPLY_STUB=1 ai-clean apply <plan_id>` forces the wrapper's stub helper to print `[stub] Would apply spec located at ...` without touching your working tree—handy for dry runs.
+- `AI_CLEAN_APPLY_COMMAND="echo applying {spec_path}" ai-clean apply <plan_id>` (or any other command containing `{spec_path}`) lets you override the wrapper's default command list.
+Make sure whatever override you provide includes the `{spec_path}` placeholder so ai-clean can substitute the generated OpenSpec change file.
+When validating inside Codex, leave these env vars unset so the wrapper runs `/prompts:openspec-apply` directly; a successful apply will print the spec path, execution log location, and test status in the CLI output.
+
 ### Reviewing changes (`/changes-review`)
 After a successful apply, run `ai-clean changes-review <plan_id> [--diff-command CMD --verbose]` to bundle the stored plan, execution metadata, and current diff into a Codex review summary. Use it before opening a PR to capture risks and recommended follow-up checks. If a plan was never applied—or tests never ran—`/changes-review` will refuse to run; do not rely on it as a substitute for running the actual cleanup.
 

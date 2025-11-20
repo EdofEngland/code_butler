@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wrapper that prefers the real `openspec apply` command.
+"""Wrapper that runs the Codex/OpenSpec apply command when available.
 
 Set AI_CLEAN_USE_APPLY_STUB=1 to fall back to the local stub helper when the
 real CLI is unavailable. Optionally override the command via
@@ -13,8 +13,13 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import Iterable, List
 
-DEFAULT_COMMAND = "openspec apply {spec_path}"
+# Local fallback commands for contributors running outside Codex.
+DEFAULT_COMMANDS = (
+    "/prompts:openspec-apply {spec_path}",
+    "openspec apply {spec_path}",
+)
 ENV_USE_STUB = "AI_CLEAN_USE_APPLY_STUB"
 ENV_COMMAND = "AI_CLEAN_APPLY_COMMAND"
 
@@ -53,34 +58,66 @@ def _run_stub(spec_path: Path) -> int:
 
 
 def _run_real_command(spec_path: Path) -> int:
-    template = os.getenv(ENV_COMMAND, DEFAULT_COMMAND)
+    templates = list(_command_templates())
+    tried: List[str] = []
+    last_error: str | None = None
+
+    for template in templates:
+        tried.append(template)
+        try:
+            command = _render_command(template, spec_path)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 5
+
+        try:
+            proc = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            # Command not available; try the next template if one exists.
+            last_error = str(exc)
+            continue
+
+        if proc.stdout:
+            sys.stdout.write(proc.stdout)
+        if proc.stderr:
+            sys.stderr.write(proc.stderr)
+        return proc.returncode
+
+    tried_cmds = ", ".join(tried) or "none"
+    error_suffix = f" Last error: {last_error}" if last_error else ""
+    print(
+        f"Unable to run any apply command (tried: {tried_cmds}). "
+        "Set AI_CLEAN_USE_APPLY_STUB=1 or specify AI_CLEAN_APPLY_COMMAND."
+        f"{error_suffix}",
+        file=sys.stderr,
+    )
+    return 5
+
+
+def _command_templates() -> Iterable[str]:
+    override = os.getenv(ENV_COMMAND)
+    if override:
+        return [override]
+    return DEFAULT_COMMANDS
+
+
+def _render_command(template: str, spec_path: Path) -> List[str]:
     if "{spec_path}" not in template:
-        print(
-            f"{ENV_COMMAND} must include '{{spec_path}}' placeholder: {template}",
-            file=sys.stderr,
+        raise ValueError(
+            f"Apply command template must include '{{spec_path}}': {template}"
         )
-        return 5
 
     quoted_path = shlex.quote(str(spec_path))
     command_str = template.replace("{spec_path}", quoted_path)
     command = shlex.split(command_str)
     if not command:
-        print("Resolved apply command is empty.", file=sys.stderr)
-        return 5
-
-    proc = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    if proc.stdout:
-        sys.stdout.write(proc.stdout)
-    if proc.stderr:
-        sys.stderr.write(proc.stderr)
-
-    return proc.returncode
+        raise ValueError("Resolved apply command is empty.")
+    return command
 
 
 if __name__ == "__main__":
