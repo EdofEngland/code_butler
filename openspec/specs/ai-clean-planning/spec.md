@@ -50,3 +50,25 @@ TBD - created by archiving change add-phase-3-1-plan-duplicate-blocks. Update Pu
 - **GIVEN** a finding and configured storage directory
 - **WHEN** plan_from_finding is invoked
 - **THEN** it produces a CleanupPlan with a unique ID and saves it under .ai-clean/plans
+
+### Requirement: Phase 8.2 Single-Concern Plans
+- Phase 8.2 Single-Concern Plans deliverables MUST be completed as described in the proposal and tasks.
+
+#### Scenario: Docstring plans keep scope to a single file
+- **GIVEN** a missing_docstring or weak_docstring finding referencing multiple files
+- **WHEN** plan_from_finding validates the finding
+- **THEN** it rejects the plan with a descriptive error stating that docstring cleanups must target a single file
+
+#### Scenario: Structure plans stay within one file
+- **GIVEN** a large_file or long_function finding referencing code in multiple files
+- **WHEN** plan_from_finding validates the finding
+- **THEN** it raises an error explaining that structural cleanups operate on one file at a time so the user can rescope the request
+- **THEN** it raises an error explaining that structural cleanups operate on one file at a time so the user can rescope the request
+
+### Requirement: Phase 8.3 No Global Renames
+- Phase 8.3 No Global Renames deliverables MUST be completed as described in the proposal and tasks.
+
+#### Scenario: Rename-heavy suggestions are blocked
+- **GIVEN** a generated CleanupPlan whose intent or steps include renaming files, classes, or APIs
+- **WHEN** allow_global_rename is disabled in configuration
+- **THEN** plan_from_finding rejects the plan with a clear error so the user can craft scoped follow-up tasks

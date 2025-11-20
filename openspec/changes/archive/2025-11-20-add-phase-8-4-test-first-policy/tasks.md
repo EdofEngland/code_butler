@@ -1,0 +1,13 @@
+## 1. Implementation
+- [x] 1.1 Record test execution status in ExecutionResult for /apply.
+  - [x] 1.1.1 Extend `ai_clean/executors/codex.py` so `_run_tests` captures the exact command and exit code in `ExecutionResult.metadata["tests"]`.
+  - [x] 1.1.2 Update `ai_clean/storage.py` and any serialization helpers to ensure the enriched metadata is persisted and loaded.
+  - [x] 1.1.3 Add regression tests verifying that skipping tests sets `tests_passed=None` and records the skip reason.
+- [x] 1.2 Display test status in CLI output and /changes-review results.
+  - [x] 1.2.1 Update `/apply` output in `ai_clean/cli.py` to include a “Tests: passed/FAILED/skipped” line plus a hint about rerunning when failures occur.
+  - [x] 1.2.2 Enhance `/changes-review` to summarize the stored test status before invoking the reviewer so the summary always includes whether tests ran.
+  - [x] 1.2.3 Extend CLI unit tests (e.g., `tests/test_cli_apply.py`, `tests/test_cli_changes_review.py`) to assert the new text appears.
+- [x] 1.3 Provide explicit messages when apply or tests fail.
+  - [x] 1.3.1 Add branching in `_run_apply_flow` so non-zero apply results print captured stderr plus guidance to inspect the diff.
+  - [x] 1.3.2 When tests fail, surface the failing command and point to the stored execution result path for debugging.
+  - [x] 1.3.3 Document the “test-first” expectation in README.md and update `openspec/specs/ai-clean-execution/spec.md` with the new messaging requirements.

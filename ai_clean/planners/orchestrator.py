@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Sequence
 
@@ -25,6 +26,25 @@ class PlannerError(ValueError):
     """Raised when a finding cannot be converted into a plan."""
 
 
+class PlanConcern(str, Enum):
+    DOCSTRING = "docstring"
+    STRUCTURE = "structure"
+    ORGANIZE = "organize"
+    DUPLICATE = "duplicate"
+    ADVANCED = "advanced"
+
+
+CONCERN_BY_CATEGORY: Dict[str, PlanConcern] = {
+    "missing_docstring": PlanConcern.DOCSTRING,
+    "weak_docstring": PlanConcern.DOCSTRING,
+    "large_file": PlanConcern.STRUCTURE,
+    "long_function": PlanConcern.STRUCTURE,
+    "organize_candidate": PlanConcern.ORGANIZE,
+    "duplicate_block": PlanConcern.DUPLICATE,
+    "advanced_cleanup": PlanConcern.ADVANCED,
+}
+
+
 def plan_from_finding(
     finding: Finding,
     *,
@@ -32,13 +52,28 @@ def plan_from_finding(
     config: "AiCleanConfig | None" = None,
 ) -> CleanupPlan:
     """Return a persisted CleanupPlan for the given finding."""
+    concern = CONCERN_BY_CATEGORY.get(finding.category)
+
     planner = _resolve_planner(finding.category)
     plan = planner(finding, chunk_index)
     plan = CleanupPlan.from_dict(plan.to_dict())
     if not plan.id:
         plan.id = _generate_plan_id(finding, chunk_index)
 
+    if concern:
+        plan.metadata.setdefault("concern", concern.value)
+        _validate_concern(finding, concern)
+
     if config:
+        plan_locations = _collect_plan_locations(plan, finding)
+        _enforce_limits(
+            plan_id=plan.id,
+            locations=plan_locations,
+            max_files=config.max_plan_files,
+            max_lines=config.max_plan_lines,
+        )
+        if not config.allow_global_rename:
+            _ensure_no_global_rename(plan)
         stored_path = storage_save_plan(plan, plans_dir=config.plans_dir)
         plan.metadata["stored_at"] = stored_path.as_posix()
 
@@ -109,6 +144,71 @@ def _generate_plan_id(finding: Finding, chunk_index: int) -> str:
     if chunk_index:
         base = f"{base}-chunk-{chunk_index}"
     return base
+
+
+def _enforce_limits(
+    *,
+    plan_id: str,
+    locations: Sequence[FindingLocation],
+    max_files: int,
+    max_lines: int,
+) -> None:
+    unique_paths = {location.path for location in locations}
+    if max_files > 0 and len(unique_paths) > max_files:
+        raise PlannerError(
+            f"Plan '{plan_id}' touches {len(unique_paths)} files; "
+            f"limit is {max_files}."
+        )
+
+    total_lines = 0
+    for location in locations:
+        span = max(location.end_line - location.start_line + 1, 1)
+        total_lines += span
+    if max_lines > 0 and total_lines > max_lines:
+        raise PlannerError(
+            f"Plan '{plan_id}' spans {total_lines} lines; " f"limit is {max_lines}."
+        )
+
+
+def _validate_concern(finding: Finding, concern: PlanConcern) -> None:
+    if concern in (PlanConcern.DOCSTRING, PlanConcern.STRUCTURE):
+        unique_files = {location.path for location in finding.locations}
+        if len(unique_files) > 1:
+            raise PlannerError(
+                f"Finding '{finding.id}' references multiple files but must stay "
+                f"within a single concern."
+            )
+
+
+def _ensure_no_global_rename(plan: CleanupPlan) -> None:
+    text_parts = [plan.intent, *plan.steps, *plan.constraints]
+    combined = " ".join(part.lower() for part in text_parts if part)
+    if "rename" in combined:
+        raise PlannerError(
+            "Global rename operations are disabled in this environment. "
+            "Adjust the plan to use localized edits or enable allow_global_rename."
+        )
+
+
+def _collect_plan_locations(
+    plan: CleanupPlan,
+    finding: Finding,
+) -> Sequence[FindingLocation]:
+    occurrences = plan.metadata.get("covered_occurrences")
+    if isinstance(occurrences, Sequence):
+        locations: list[FindingLocation] = []
+        for item in occurrences:
+            try:
+                path = str(item["path"])
+                start = int(item["start_line"])
+                end = int(item.get("end_line", start))
+            except (KeyError, TypeError, ValueError):
+                locations = []
+                break
+            locations.append(FindingLocation(path=path, start_line=start, end_line=end))
+        if locations:
+            return locations
+    return finding.locations
 
 
 __all__ = ["plan_from_finding", "PlannerError"]

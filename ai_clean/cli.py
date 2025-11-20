@@ -7,7 +7,7 @@ import importlib
 import os
 import subprocess
 from pathlib import Path
-from typing import Callable, Iterable, Tuple
+from typing import Any, Callable, Dict, Iterable, Tuple
 
 # CLI commands intentionally avoid executor/storage imports so they remain
 # read-only; plan storage happens inside planner orchestrators.
@@ -214,15 +214,29 @@ def _run_apply_flow(
     finally:
         config.tests.default_command = original_tests
 
-    save_execution_result(
+    execution_path = save_execution_result(
         result,
         plan_id,
         executions_dir=config.executions_dir,
     )
 
+    print(f"Execution result stored at: {execution_path}")
     print(f"Apply success: {'yes' if result.success else 'no'}")
-    tests_label = _describe_tests_status(result.tests_passed, skip_tests)
+    if not result.success:
+        _print_apply_failure_hint(result.metadata.get("apply"), execution_path)
+
+    tests_metadata = result.metadata.get("tests") or {}
+    tests_label = _describe_tests_status(
+        result.tests_passed,
+        skip_tests,
+        tests_metadata,
+    )
+    if result.tests_passed is False:
+        tests_label = f"{tests_label} (see {execution_path})"
     print(f"Tests: {tests_label}")
+    if result.tests_passed is False:
+        _print_tests_failure_hint(tests_metadata, execution_path)
+
     _print_text_block("Executor stdout", result.stdout)
     _print_text_block("Executor stderr", result.stderr)
 
@@ -579,6 +593,13 @@ def _changes_review_handler(args: argparse.Namespace) -> int:
         print(f"Failed to capture diff: {exc}")
         return 2
 
+    stored_tests = _describe_tests_status(
+        execution_result.tests_passed,
+        skip_flag=False,
+        tests_metadata=execution_result.metadata.get("tests"),
+    )
+    print(f"Stored tests: {stored_tests}")
+
     try:
         completion = _load_review_completion()
     except (ImportError, AttributeError, ValueError, RuntimeError) as exc:
@@ -791,13 +812,21 @@ def _print_numbered_section(label: str, items: Iterable[str]) -> None:
         print("  (none)")
 
 
-def _describe_tests_status(tests_passed: bool | None, skip_flag: bool) -> str:
+def _describe_tests_status(
+    tests_passed: bool | None,
+    skip_flag: bool,
+    tests_metadata: Dict[str, Any] | None,
+) -> str:
     if skip_flag:
         return "skipped (--skip-tests)"
+    meta = tests_metadata or {}
     if tests_passed is True:
         return "passed"
     if tests_passed is False:
         return "FAILED"
+    reason = meta.get("reason")
+    if reason:
+        return f"skipped ({reason.replace('_', ' ')})"
     return "skipped"
 
 
@@ -808,6 +837,37 @@ def _print_text_block(label: str, text: str, limit: int = 800) -> None:
     if not content:
         content = "(empty)"
     print(f"{label}:\n{content}")
+
+
+def _print_apply_failure_hint(
+    apply_metadata: Dict[str, Any] | None,
+    execution_path: Path,
+) -> None:
+    meta = apply_metadata or {}
+    command = meta.get("command")
+    if command:
+        cmd_str = " ".join(str(part) for part in command)
+        print(f"Apply command: {cmd_str}")
+    return_code = meta.get("returncode")
+    if return_code is not None:
+        print(f"Apply return code: {return_code}")
+    print("Apply failed. Review the stderr above and inspect the diff for issues.")
+    print(f"Full logs stored at: {execution_path}")
+
+
+def _print_tests_failure_hint(
+    tests_metadata: Dict[str, Any],
+    execution_path: Path,
+) -> None:
+    command = tests_metadata.get("command")
+    if command:
+        cmd_str = " ".join(str(part) for part in command)
+        print(f"Tests command: {cmd_str}")
+    return_code = tests_metadata.get("returncode")
+    if return_code is not None:
+        print(f"Tests return code: {return_code}")
+    print("Tests failed. Re-run them locally, address issues, and reapply the plan.")
+    print(f"See execution logs at: {execution_path}")
 
 
 def _order_clean_findings(findings: list["Finding"]) -> list["Finding"]:

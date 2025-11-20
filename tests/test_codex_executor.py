@@ -53,6 +53,8 @@ class CodexExecutorTests(unittest.TestCase):
         self.assertIn("tests-ok", result.stdout)
         self.assertIn("apply-warn", result.stderr)
         self.assertEqual(result.metadata["tests"]["returncode"], 0)
+        self.assertEqual(result.metadata["tests"]["stdout"], "tests-ok")
+        self.assertEqual(result.metadata["apply"]["stdout"], "apply-ok")
 
     def test_skips_tests_when_apply_fails(self) -> None:
         executor = CodexExecutor(
@@ -71,6 +73,20 @@ class CodexExecutorTests(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertIsNone(result.tests_passed)
         self.assertEqual(result.metadata["tests"]["reason"], "apply_failed")
+
+    def test_skips_tests_metadata_when_disabled(self) -> None:
+        executor = CodexExecutor(
+            apply_command=["echo", "{spec_path}"],
+            tests_command=None,
+        )
+
+        with mock.patch(
+            "ai_clean.executors.codex.subprocess.run",
+            return_value=SimpleNamespace(returncode=0, stdout="ok", stderr=""),
+        ):
+            result = executor.apply_spec(self.spec_path.as_posix())
+
+        self.assertEqual(result.metadata["tests"]["reason"], "tests_disabled")
 
 
 if __name__ == "__main__":  # pragma: no cover

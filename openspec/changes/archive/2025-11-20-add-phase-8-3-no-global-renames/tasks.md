@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Embed constraints against global renames and API overhauls in planner logic and prompts.
+  - [x] 1.1.1 Update the system prompts/templates inside `ai_clean/planners/*.py` and `ai_clean/analyzers/advanced.py` to explicitly forbid cross-project renames or public API restructuring.
+  - [x] 1.1.2 Add a shared validator in `ai_clean/planners/orchestrator.py` that inspects planned file operations; if file paths span unrelated packages or include wildcard renames, flag them as invalid.
+  - [x] 1.1.3 Introduce configuration flags (e.g., `allow_global_rename`) defaulting to `False` so tests can exercise both behaviors.
+- [x] 1.2 Handle violations by downgrading or rejecting risky suggestions.
+  - [x] 1.2.1 Teach planners to detect rename intents (e.g., metadata fields or `mv` steps) and convert them into localized refactors (single file/class) when possible.
+  - [x] 1.2.2 When a finding cannot be localized, raise `PlannerError` with `metadata["blocked_reason"]="global_rename"` so the CLI can report the limitation.
+  - [x] 1.2.3 Add unit tests proving that attempts to rename files across modules or touching public API entries are rejected with the new error.
+- [x] 1.3 Communicate the v0 limitation in planner outputs.
+  - [x] 1.3.1 Update CLI messaging (plan/clean/organize handlers) to surface the blocked reason when a global rename is rejected and advise users to craft a smaller change.
+  - [x] 1.3.2 Document the limitation in README.md and `openspec/specs/ai-clean-planning/spec.md`, including examples of acceptable rename scope.

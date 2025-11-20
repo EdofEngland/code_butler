@@ -34,3 +34,11 @@ TBD - created by archiving change add-phase-5-1-codex-executor-apply. Update Pur
 - **GIVEN** ai-clean.toml defines executor and review types
 - **WHEN** the factories are invoked
 - **THEN** they return the configured implementations or raise clear errors for unsupported values
+
+### Requirement: Phase 8.4 Test-First Policy
+- Phase 8.4 Test-First Policy deliverables MUST be completed as described in the proposal and tasks.
+
+#### Scenario: CLI surfaces apply/test outcomes
+- **GIVEN** `/apply` runs for a plan
+- **WHEN** code execution completes
+- **THEN** the CLI prints whether tests ran and passed, stores the execution result path, and `/changes-review` echoes the stored test status before running the reviewer

@@ -92,6 +92,7 @@ def test_apply_command_runs_full_flow(
     assert "Apply success: yes" in output
     assert "Tests: passed" in output
     assert "Changes:" in output
+    assert "Execution result stored at:" in output
 
 
 def test_apply_command_handles_missing_plan(
@@ -151,4 +152,108 @@ def test_apply_command_can_skip_tests(
     exit_code = cli.main(["apply", "plan-xyz", "--skip-tests"])
 
     assert exit_code == 0
-    assert "Tests: skipped (--skip-tests)" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Tests: skipped (--skip-tests)" in output
+    assert "Execution result stored at:" in output
+
+
+def test_apply_command_reports_test_failure(
+    monkeypatch: pytest.MonkeyPatch, capsys, tmp_path
+) -> None:
+    plan = _make_plan("plan-tests")
+    config = _make_config(tmp_path)
+
+    class FakeBackend:
+        def plan_to_spec(self, provided_plan: CleanupPlan) -> SpecChange:
+            return SpecChange(id="spec-3", backend_type="openspec", payload={})
+
+        def write_spec(self, spec: SpecChange, directory: str) -> str:
+            return f"{directory}/spec.yaml"
+
+    class FakeExecutor:
+        def apply_spec(self, spec_path: str) -> ExecutionResult:
+            return ExecutionResult(
+                spec_id="spec-3",
+                success=True,
+                tests_passed=False,
+                stdout="apply",
+                stderr="",
+                metadata={
+                    "tests": {
+                        "command": ["pytest"],
+                        "returncode": 1,
+                        "stdout": "",
+                        "stderr": "boom",
+                    },
+                    "apply": {
+                        "command": ["apply"],
+                        "returncode": 0,
+                        "stdout": "",
+                        "stderr": "",
+                    },
+                },
+            )
+
+    monkeypatch.setattr(cli, "load_config", lambda: config)
+    monkeypatch.setattr(cli, "ensure_on_refactor_branch", lambda base, ref: None)
+    monkeypatch.setattr(cli, "load_plan", lambda plan_id, plans_dir=None: plan)
+    monkeypatch.setattr(cli, "build_spec_backend", lambda cfg: FakeBackend())
+    monkeypatch.setattr(cli, "build_code_executor", lambda cfg: FakeExecutor())
+    monkeypatch.setattr(cli, "get_diff_stat", lambda: "Changes:\n none")
+
+    exit_code = cli.main(["apply", "plan-tests"])
+
+    assert exit_code == 2
+    output = capsys.readouterr().out
+    assert "Tests: FAILED" in output
+    assert "Tests command: pytest" in output
+    assert "See execution logs at" in output
+
+
+def test_apply_command_reports_apply_failure(
+    monkeypatch: pytest.MonkeyPatch, capsys, tmp_path
+) -> None:
+    plan = _make_plan("plan-fail")
+    config = _make_config(tmp_path)
+
+    class FakeBackend:
+        def plan_to_spec(self, provided_plan: CleanupPlan) -> SpecChange:
+            return SpecChange(id="spec-4", backend_type="openspec", payload={})
+
+        def write_spec(self, spec: SpecChange, directory: str) -> str:
+            return f"{directory}/spec.yaml"
+
+    class FakeExecutor:
+        def apply_spec(self, spec_path: str) -> ExecutionResult:
+            return ExecutionResult(
+                spec_id="spec-4",
+                success=False,
+                tests_passed=None,
+                stdout="apply",
+                stderr="fail",
+                metadata={
+                    "apply": {
+                        "command": ["apply"],
+                        "returncode": 1,
+                        "stdout": "",
+                        "stderr": "fail",
+                    },
+                    "tests": {"reason": "apply_failed"},
+                },
+            )
+
+    monkeypatch.setattr(cli, "load_config", lambda: config)
+    monkeypatch.setattr(cli, "ensure_on_refactor_branch", lambda base, ref: None)
+    monkeypatch.setattr(cli, "load_plan", lambda plan_id, plans_dir=None: plan)
+    monkeypatch.setattr(cli, "build_spec_backend", lambda cfg: FakeBackend())
+    monkeypatch.setattr(cli, "build_code_executor", lambda cfg: FakeExecutor())
+    monkeypatch.setattr(cli, "get_diff_stat", lambda: "Changes:\n none")
+
+    exit_code = cli.main(["apply", "plan-fail"])
+
+    assert exit_code == 2
+    output = capsys.readouterr().out
+    assert "Apply success: no" in output
+    assert "Apply command: apply" in output
+    assert "Apply return code: 1" in output
+    assert "Apply failed." in output

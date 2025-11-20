@@ -30,6 +30,8 @@ if tomllib is None:  # pragma: no cover - Python <3.11 fallback
 
 SUPPORTED_EXECUTORS = {"codex"}
 SUPPORTED_REVIEW = {"codex_review"}
+DEFAULT_MAX_PLAN_FILES = 5
+DEFAULT_MAX_PLAN_LINES = 400
 
 
 @dataclass
@@ -70,6 +72,9 @@ class AiCleanConfig:
     plans_dir: Path
     specs_dir: Path
     executions_dir: Path
+    max_plan_files: int
+    max_plan_lines: int
+    allow_global_rename: bool
 
 
 def _require(section: Dict[str, Any], key: str) -> str:
@@ -95,6 +100,22 @@ def _get_section(config: Dict[str, Any], name: str) -> Dict[str, Any]:
     section = dict(config.get(name, {}) or {})
     section["__name__"] = name
     return section
+
+
+def _get_int(
+    section: Dict[str, Any],
+    key: str,
+    *,
+    default: int,
+) -> int:
+    value = section.get(key, default)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        section_name = section.get("__name__") or "unknown"
+        raise ValueError(
+            f"Invalid integer value for '{key}' in [{section_name}] section"
+        ) from None
 
 
 def _require_command_list(
@@ -138,6 +159,7 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     review_section = _get_section(raw_cfg, "review")
     git_section = _get_section(raw_cfg, "git")
     tests_section = _get_section(raw_cfg, "tests")
+    limits_section = _get_section(raw_cfg, "limits")
 
     spec_backend = SpecBackendConfig(type=_require(spec_backend_section, "type"))
     executor = ExecutorConfig(
@@ -174,6 +196,18 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     specs_dir.mkdir(parents=True, exist_ok=True)
     executions_dir.mkdir(parents=True, exist_ok=True)
 
+    max_plan_files = _get_int(
+        limits_section,
+        "max_plan_files",
+        default=DEFAULT_MAX_PLAN_FILES,
+    )
+    max_plan_lines = _get_int(
+        limits_section,
+        "max_plan_lines",
+        default=DEFAULT_MAX_PLAN_LINES,
+    )
+    allow_global_rename = bool(limits_section.get("allow_global_rename", False))
+
     return AiCleanConfig(
         spec_backend=spec_backend,
         executor=executor,
@@ -184,6 +218,9 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
         plans_dir=plans_dir,
         specs_dir=specs_dir,
         executions_dir=executions_dir,
+        max_plan_files=max_plan_files,
+        max_plan_lines=max_plan_lines,
+        allow_global_rename=allow_global_rename,
     )
 
 

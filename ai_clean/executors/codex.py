@@ -52,23 +52,30 @@ class CodexExecutor(CodeExecutor):
             "apply": {
                 "command": apply_cmd,
                 "returncode": apply_proc.returncode,
+                "stdout": stdout,
+                "stderr": stderr,
             }
         }
 
         tests_passed: bool | None = None
+        test_metadata: Dict[str, Any] = {}
         if success and self._tests_command:
             test_capture = self._run_tests()
-            metadata["tests"] = {
-                "command": test_capture.command,
+            test_metadata = {
+                "command": list(test_capture.command),
                 "returncode": test_capture.returncode,
+                "stdout": test_capture.stdout,
+                "stderr": test_capture.stderr,
             }
             stdout = _append_section(stdout, "== TESTS ==", test_capture.stdout)
             stderr = _append_section(stderr, "== TESTS ==", test_capture.stderr)
             tests_passed = test_capture.returncode == 0
         elif success:
-            metadata["tests"] = {"skipped": True, "reason": "tests_disabled"}
+            test_metadata = {"skipped": True, "reason": "tests_disabled"}
         else:
-            metadata["tests"] = {"skipped": True, "reason": "apply_failed"}
+            test_metadata = {"skipped": True, "reason": "apply_failed"}
+
+        metadata["tests"] = test_metadata
 
         return ExecutionResult(
             spec_id=target.stem,

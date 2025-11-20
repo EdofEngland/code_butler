@@ -33,6 +33,9 @@ def _config(
         plans_dir=base_dir,
         specs_dir=base_dir,
         executions_dir=base_dir,
+        max_plan_files=5,
+        max_plan_lines=400,
+        allow_global_rename=False,
     )
 
 

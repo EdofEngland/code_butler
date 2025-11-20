@@ -73,6 +73,7 @@ def test_changes_review_prints_sections(
 
     assert exit_code == 0
     output = capsys.readouterr().out
+    assert "Stored tests: passed" in output
     assert "Summary:" in output
     assert "Risks:" in output
     assert "Suggested checks:" in output

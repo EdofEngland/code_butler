@@ -10,6 +10,7 @@ import pytest
 
 from ai_clean import cli
 from ai_clean.models import CleanupPlan, Finding, FindingLocation
+from ai_clean.planners.orchestrator import PlannerError
 
 
 def _make_location(path: str, start: int, end: int) -> FindingLocation:
@@ -104,3 +105,23 @@ def test_plan_command_errors_when_ids_ambiguous(
 
     assert exit_code == 2
     assert "Provide a narrower --path" in capsys.readouterr().out
+
+
+def test_plan_command_surfaces_planner_errors(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    finding = _make_finding(finding_id="doc-1", path="pkg/module.py")
+    monkeypatch.setattr(cli, "analyze_repo", lambda path: [finding])
+    fake_config = SimpleNamespace(plans_dir="dir")
+    monkeypatch.setattr(cli, "load_config", lambda: fake_config)
+
+    def fake_plan_from_finding(*_, **__):
+        raise PlannerError("limit exceeded")
+
+    monkeypatch.setattr(cli, "plan_from_finding", fake_plan_from_finding)
+
+    exit_code = cli.main(["plan", "doc-1"])
+
+    assert exit_code == 2
+    output = capsys.readouterr().out
+    assert "Failed to build plan: limit exceeded" in output
