@@ -10,8 +10,13 @@ apply_command = ["bash", "-lc", "openspec apply {spec_path}"]
 type = "codex_review"
 
 [git]
-base_branch = "main"
+base_branch = "V0-Tool-Test"
 refactor_branch = "refactor/ai-clean"
 
 [tests]
 default_command = "pytest -q"
+
+[limits]
+max_plan_files = 5
+max_plan_lines = 400
+allow_global_rename = false
