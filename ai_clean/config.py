@@ -7,6 +7,7 @@ no TOML parser is available.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
@@ -29,9 +30,13 @@ if tomllib is None:  # pragma: no cover - Python <3.11 fallback
 
 
 SUPPORTED_EXECUTORS = {"codex"}
+SUPPORTED_EXECUTOR_BACKENDS = {"codex"}
 SUPPORTED_REVIEW = {"codex_review"}
 DEFAULT_MAX_PLAN_FILES = 5
 DEFAULT_MAX_PLAN_LINES = 400
+ENV_EXECUTOR_BACKEND = "AI_CLEAN_EXECUTOR_BACKEND"
+ENV_EXECUTOR_COMMAND_PREFIX = "AI_CLEAN_EXECUTOR_COMMAND_PREFIX"
+ENV_EXECUTOR_PROMPT_HINT = "AI_CLEAN_EXECUTOR_PROMPT_HINT"
 
 
 @dataclass
@@ -43,6 +48,13 @@ class SpecBackendConfig:
 class ExecutorConfig:
     type: str
     apply_command: List[str]
+
+
+@dataclass
+class ExecutorBackendConfig:
+    type: str
+    command_prefix: str
+    prompt_hint: str
 
 
 @dataclass
@@ -65,6 +77,7 @@ class TestsConfig:
 class AiCleanConfig:
     spec_backend: SpecBackendConfig
     executor: ExecutorConfig
+    executor_backend: ExecutorBackendConfig
     review: ReviewConfig
     git: GitConfig
     tests: TestsConfig
@@ -156,6 +169,7 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
 
     spec_backend_section = _get_section(raw_cfg, "spec_backend")
     executor_section = _get_section(raw_cfg, "executor")
+    executor_backend_section = _get_section(raw_cfg, "executor_backend")
     review_section = _get_section(raw_cfg, "review")
     git_section = _get_section(raw_cfg, "git")
     tests_section = _get_section(raw_cfg, "tests")
@@ -169,6 +183,26 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
             "apply_command",
             require_placeholder=True,
         ),
+    )
+    backend_type = (
+        os.getenv(ENV_EXECUTOR_BACKEND)
+        or executor_backend_section.get("type")
+        or "codex"
+    )
+    backend_prefix = (
+        os.getenv(ENV_EXECUTOR_COMMAND_PREFIX)
+        or executor_backend_section.get("command_prefix")
+        or "/openspec-apply"
+    )
+    backend_prompt = (
+        os.getenv(ENV_EXECUTOR_PROMPT_HINT)
+        or executor_backend_section.get("prompt_hint")
+        or "/prompts:openspec-apply"
+    )
+    executor_backend = ExecutorBackendConfig(
+        type=str(backend_type).strip(),
+        command_prefix=str(backend_prefix).strip() or "/openspec-apply",
+        prompt_hint=str(backend_prompt).strip(),
     )
     review = ReviewConfig(type=_require(review_section, "type"))
     git = GitConfig(
@@ -186,6 +220,15 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     executor.type = _validate_choice(
         "executor", "type", executor.type, SUPPORTED_EXECUTORS
     )
+    executor_backend.type = _validate_choice(
+        "executor_backend",
+        "type",
+        executor_backend.type or "codex",
+        SUPPORTED_EXECUTOR_BACKENDS,
+    )
+    if not executor_backend.command_prefix:
+        raise ValueError("executor_backend.command_prefix cannot be empty.")
+
     review.type = _validate_choice("review", "type", review.type, SUPPORTED_REVIEW)
 
     metadata_root = Path(".ai-clean")
@@ -211,6 +254,7 @@ def load_config(config_path: Path | str = "ai-clean.toml") -> AiCleanConfig:
     return AiCleanConfig(
         spec_backend=spec_backend,
         executor=executor,
+        executor_backend=executor_backend,
         review=review,
         git=git,
         tests=tests,

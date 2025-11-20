@@ -1,0 +1,23 @@
+# Example Codex slash command for applying ai-clean changes.
+command: /code-butler-apply
+description: |
+  Run ai-clean apply for a stored plan id and immediately invoke
+  /openspec-apply inside Codex.
+parameters:
+  - name: plan_id
+    description: Cleanup plan ID saved by ai-clean (e.g., src-foo-bar-cleanup)
+    required: true
+script: |
+  # Step 1: run ai-clean locally (assumes repo already checked out)
+  ai-clean apply {{plan_id}}
+
+  # Step 2: apply the OpenSpec change within Codex.
+  # ai-clean prints "Backend instructions: ..." which uses {{plan_id}}
+  # as the change id, so we can reuse the input value directly.
+  /openspec-apply {{plan_id}}
+
+notes:
+  - ai-clean writes specs under .ai-clean/specs/. Adjust the repo path
+    if your Codex tab does not start in the repo root.
+  - Customize the apply command by editing ai-clean.toml or exporting
+    AI_CLEAN_EXECUTOR_COMMAND_PREFIX / AI_CLEAN_EXECUTOR_PROMPT_HINT.

@@ -8,6 +8,7 @@ from typing import List
 import pytest
 
 from ai_clean import cli
+from ai_clean.executors.backends import BackendApplyResult
 from ai_clean.models import CleanupPlan, ExecutionResult, SpecChange
 
 
@@ -33,6 +34,22 @@ def _make_config(tmp_path) -> SimpleNamespace:
         tests=SimpleNamespace(default_command="pytest"),
         spec_backend=SimpleNamespace(type="openspec"),
         executor=SimpleNamespace(type="codex", apply_command=["apply {spec_path}"]),
+        executor_backend=SimpleNamespace(
+            type="codex",
+            command_prefix="/openspec-apply",
+            prompt_hint="/prompts:openspec-apply",
+        ),
+    )
+
+
+def _auto_backend() -> SimpleNamespace:
+    return SimpleNamespace(
+        apply=lambda *_: BackendApplyResult(
+            status="automatic",
+            instructions="auto backend instructions",
+            metadata={},
+            tests_supported=True,
+        )
     )
 
 
@@ -72,6 +89,7 @@ def test_apply_command_runs_full_flow(
     monkeypatch.setattr(cli, "ensure_on_refactor_branch", lambda base, ref: None)
     monkeypatch.setattr(cli, "load_plan", lambda plan_id, plans_dir=None: plan)
     monkeypatch.setattr(cli, "build_spec_backend", lambda cfg: FakeBackend())
+    monkeypatch.setattr(cli, "build_executor_backend", lambda cfg: _auto_backend())
     monkeypatch.setattr(cli, "build_code_executor", lambda cfg: FakeExecutor())
 
     def fake_save_execution_result(result, plan_id, executions_dir=None):
@@ -145,6 +163,7 @@ def test_apply_command_can_skip_tests(
     monkeypatch.setattr(cli, "ensure_on_refactor_branch", lambda base, ref: None)
     monkeypatch.setattr(cli, "load_plan", lambda plan_id, plans_dir=None: plan)
     monkeypatch.setattr(cli, "build_spec_backend", lambda cfg: FakeBackend())
+    monkeypatch.setattr(cli, "build_executor_backend", lambda cfg: _auto_backend())
     monkeypatch.setattr(cli, "build_code_executor", fake_build_code_executor)
     monkeypatch.setattr(cli, "save_execution_result", lambda *args, **kwargs: None)
     monkeypatch.setattr(cli, "get_diff_stat", lambda: "Changes:\n none")
@@ -198,6 +217,7 @@ def test_apply_command_reports_test_failure(
     monkeypatch.setattr(cli, "ensure_on_refactor_branch", lambda base, ref: None)
     monkeypatch.setattr(cli, "load_plan", lambda plan_id, plans_dir=None: plan)
     monkeypatch.setattr(cli, "build_spec_backend", lambda cfg: FakeBackend())
+    monkeypatch.setattr(cli, "build_executor_backend", lambda cfg: _auto_backend())
     monkeypatch.setattr(cli, "build_code_executor", lambda cfg: FakeExecutor())
     monkeypatch.setattr(cli, "get_diff_stat", lambda: "Changes:\n none")
 
@@ -246,6 +266,7 @@ def test_apply_command_reports_apply_failure(
     monkeypatch.setattr(cli, "ensure_on_refactor_branch", lambda base, ref: None)
     monkeypatch.setattr(cli, "load_plan", lambda plan_id, plans_dir=None: plan)
     monkeypatch.setattr(cli, "build_spec_backend", lambda cfg: FakeBackend())
+    monkeypatch.setattr(cli, "build_executor_backend", lambda cfg: _auto_backend())
     monkeypatch.setattr(cli, "build_code_executor", lambda cfg: FakeExecutor())
     monkeypatch.setattr(cli, "get_diff_stat", lambda: "Changes:\n none")
 
@@ -257,3 +278,49 @@ def test_apply_command_reports_apply_failure(
     assert "Apply command: apply" in output
     assert "Apply return code: 1" in output
     assert "Apply failed." in output
+
+
+def test_apply_command_manual_backend_skips_executor(
+    monkeypatch: pytest.MonkeyPatch, capsys, tmp_path
+) -> None:
+    plan = _make_plan("plan-manual")
+    config = _make_config(tmp_path)
+
+    class FakeBackend:
+        def plan_to_spec(self, provided_plan: CleanupPlan) -> SpecChange:
+            return SpecChange(id="spec-manual", backend_type="openspec", payload={})
+
+        def write_spec(self, spec: SpecChange, directory: str) -> str:
+            return f"{directory}/spec.yaml"
+
+    class ManualBackend:
+        def apply(self, change_id: str, spec_path: str) -> BackendApplyResult:
+            assert change_id == plan.id
+            assert spec_path.endswith("spec.yaml")
+            return BackendApplyResult(
+                status="manual",
+                instructions="run /openspec-apply plan-manual",
+                metadata={"backend": "codex"},
+                tests_supported=False,
+            )
+
+    def fail_code_executor(_):
+        raise AssertionError("Code executor should not be built for manual backend")
+
+    monkeypatch.setattr(cli, "load_config", lambda: config)
+    monkeypatch.setattr(cli, "ensure_on_refactor_branch", lambda base, ref: None)
+    monkeypatch.setattr(cli, "load_plan", lambda plan_id, plans_dir=None: plan)
+    monkeypatch.setattr(cli, "build_spec_backend", lambda cfg: FakeBackend())
+    monkeypatch.setattr(cli, "build_executor_backend", lambda cfg: ManualBackend())
+    monkeypatch.setattr(cli, "build_code_executor", fail_code_executor)
+    monkeypatch.setattr(
+        cli, "save_execution_result", lambda *args, **kwargs: tmp_path / "exec.json"
+    )
+    monkeypatch.setattr(cli, "get_diff_stat", lambda: "Changes:\n none")
+
+    exit_code = cli.main(["apply", "plan-manual"])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Backend instructions: run /openspec-apply plan-manual" in output
+    assert "Tests: skipped (manual backend)" in output

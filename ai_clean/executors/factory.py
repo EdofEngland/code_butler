@@ -7,13 +7,19 @@ from typing import Callable, Dict, Type
 from ai_clean.config import AiCleanConfig
 from ai_clean.interfaces import CodeExecutor, ReviewExecutor
 
+from .backends import ExecutorBackend
 from .codex import CodexExecutor
+from .codex_backend import CodexExecutorBackend
 from .review import CodexReviewExecutor
 
 CodexCompletion = Callable[[str], object]
 
 SUPPORTED_CODE_EXECUTORS: Dict[str, Type[CodeExecutor]] = {
     "codex": CodexExecutor,
+}
+
+SUPPORTED_EXECUTOR_BACKENDS: Dict[str, Type[ExecutorBackend]] = {
+    "codex": CodexExecutorBackend,
 }
 
 SUPPORTED_REVIEW_EXECUTORS: Dict[str, Type[ReviewExecutor]] = {
@@ -44,6 +50,23 @@ def build_code_executor(config: AiCleanConfig) -> CodeExecutor:
     )
 
 
+def build_executor_backend(config: AiCleanConfig) -> ExecutorBackend:
+    backend_type = (config.executor_backend.type or "").strip().lower() or "codex"
+    backend_cls = SUPPORTED_EXECUTOR_BACKENDS.get(backend_type)
+    if backend_cls is None:
+        allowed = ", ".join(sorted(SUPPORTED_EXECUTOR_BACKENDS))
+        raise ValueError(
+            f"Unsupported executor backend '{backend_type}'. Allowed values: {allowed}"
+        )
+
+    if backend_type == "codex":
+        return backend_cls(
+            command_prefix=config.executor_backend.command_prefix or "/openspec-apply",
+            prompt_hint=config.executor_backend.prompt_hint or None,
+        )
+    return backend_cls()
+
+
 def build_review_executor(
     config: AiCleanConfig,
     *,
@@ -70,7 +93,9 @@ def build_review_executor(
 
 __all__ = [
     "build_code_executor",
+    "build_executor_backend",
     "build_review_executor",
     "SUPPORTED_CODE_EXECUTORS",
+    "SUPPORTED_EXECUTOR_BACKENDS",
     "SUPPORTED_REVIEW_EXECUTORS",
 ]

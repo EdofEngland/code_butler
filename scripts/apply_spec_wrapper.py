@@ -18,7 +18,7 @@ from typing import Iterable, List
 # Local fallback commands for contributors running outside Codex.
 DEFAULT_COMMANDS = (
     "/prompts:openspec-apply {spec_path}",
-    "openspec apply {spec_path}",
+    "/openspec-apply {spec_path}",
 )
 ENV_USE_STUB = "AI_CLEAN_USE_APPLY_STUB"
 ENV_COMMAND = "AI_CLEAN_APPLY_COMMAND"

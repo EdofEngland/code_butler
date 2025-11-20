@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING, Callable, Dict, Sequence
 
 if TYPE_CHECKING:
     from ai_clean.config import AiCleanConfig
+
+from ai_clean.analyzers.organize.planner import plan_file_moves
 from ai_clean.models import CleanupPlan, Finding, FindingLocation
 from ai_clean.planners.advanced import plan_advanced_cleanup
 from ai_clean.planners.docstrings import plan_docstring_fix
 from ai_clean.planners.duplicate import _chunk_occurrences, plan_duplicate_block
-from ai_clean.planners.organize import plan_file_moves
 from ai_clean.planners.structure import (
     plan_large_file_split,
     plan_long_function_helper,

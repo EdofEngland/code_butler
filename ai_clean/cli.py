@@ -13,13 +13,18 @@ from typing import Any, Callable, Dict, Iterable, Tuple
 # read-only; plan storage happens inside planner orchestrators.
 from ai_clean.analyzers.orchestrator import analyze_repo, format_location_summary
 from ai_clean.config import AiCleanConfig, load_config
-from ai_clean.executors.factory import build_code_executor, build_review_executor
+from ai_clean.executors.backends import BackendApplyResult
+from ai_clean.executors.factory import (
+    build_code_executor,
+    build_executor_backend,
+    build_review_executor,
+)
 from ai_clean.git_helpers import (
     GitError,
     ensure_on_refactor_branch,
     get_diff_stat,
 )
-from ai_clean.models import Finding
+from ai_clean.models import ExecutionResult, Finding
 from ai_clean.planners.orchestrator import PlannerError, plan_from_finding
 from ai_clean.spec_backends.factory import build_spec_backend
 from ai_clean.storage import (
@@ -193,26 +198,44 @@ def _run_apply_flow(
         print(f"Failed to load plan '{plan_id}': {exc}")
         return 2
 
-    backend = build_spec_backend(config)
-    spec = backend.plan_to_spec(plan)
+    spec_backend = build_spec_backend(config)
+    spec = spec_backend.plan_to_spec(plan)
 
     spec_dir_path = Path(spec_dir) if spec_dir else config.specs_dir
     spec_dir_path.mkdir(parents=True, exist_ok=True)
-    spec_path = backend.write_spec(spec, directory=str(spec_dir_path))
+    spec_path = spec_backend.write_spec(spec, directory=str(spec_dir_path))
     print(f"Spec written to: {spec_path}")
 
-    original_tests = config.tests.default_command
-    if skip_tests:
-        config.tests.default_command = ""
+    backend_executor = build_executor_backend(config)
+    backend_result = backend_executor.apply(plan.id, spec_path)
+    print(f"Backend instructions: {backend_result.instructions}")
 
-    try:
-        executor = build_code_executor(config)
-        result = executor.apply_spec(spec_path)
-    except Exception as exc:  # pragma: no cover - defensive
-        print(f"Failed to apply spec: {exc}")
-        return 2
-    finally:
-        config.tests.default_command = original_tests
+    result: ExecutionResult
+    if backend_result.status == "manual":
+        result = _build_manual_execution_result(spec_path, backend_result)
+    else:
+        original_tests = config.tests.default_command
+        if skip_tests:
+            config.tests.default_command = ""
+
+        try:
+            executor = build_code_executor(config)
+            result = executor.apply_spec(spec_path)
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"Failed to apply spec: {exc}")
+            return 2
+        finally:
+            config.tests.default_command = original_tests
+
+        backend_meta = dict(backend_result.metadata or {})
+        backend_meta.update(
+            {
+                "status": backend_result.status,
+                "instructions": backend_result.instructions,
+                "tests_supported": backend_result.tests_supported,
+            }
+        )
+        result.metadata["backend"] = backend_meta
 
     execution_path = save_execution_result(
         result,
@@ -828,6 +851,33 @@ def _describe_tests_status(
     if reason:
         return f"skipped ({reason.replace('_', ' ')})"
     return "skipped"
+
+
+def _build_manual_execution_result(
+    spec_path: str,
+    backend_result: BackendApplyResult,
+) -> ExecutionResult:
+    backend_meta = dict(backend_result.metadata or {})
+    backend_meta.update(
+        {
+            "status": backend_result.status,
+            "instructions": backend_result.instructions,
+            "tests_supported": backend_result.tests_supported,
+        }
+    )
+    metadata = {
+        "backend": backend_meta,
+        "tests": {"skipped": True, "reason": "manual_backend"},
+    }
+    spec_id = Path(spec_path).stem
+    return ExecutionResult(
+        spec_id=spec_id,
+        success=True,
+        tests_passed=None,
+        stdout=backend_result.instructions,
+        stderr="",
+        metadata=metadata,
+    )
 
 
 def _print_text_block(label: str, text: str, limit: int = 800) -> None:

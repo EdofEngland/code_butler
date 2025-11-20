@@ -5,14 +5,19 @@ from pathlib import Path
 
 from ai_clean.config import (
     AiCleanConfig,
+    ExecutorBackendConfig,
     ExecutorConfig,
     GitConfig,
     ReviewConfig,
     SpecBackendConfig,
     TestsConfig,
 )
-from ai_clean.executors import CodexExecutor
-from ai_clean.executors.factory import build_code_executor, build_review_executor
+from ai_clean.executors import CodexExecutor, CodexExecutorBackend
+from ai_clean.executors.factory import (
+    build_code_executor,
+    build_executor_backend,
+    build_review_executor,
+)
 
 
 def _config(
@@ -26,6 +31,11 @@ def _config(
         executor=ExecutorConfig(
             type=executor_type,
             apply_command=["scripts/apply_spec_wrapper.py", "{spec_path}"],
+        ),
+        executor_backend=ExecutorBackendConfig(
+            type="codex",
+            command_prefix="/openspec-apply",
+            prompt_hint="/prompts:openspec-apply",
         ),
         review=ReviewConfig(type=review_type),
         git=GitConfig(base_branch="main", refactor_branch="feature"),
@@ -46,6 +56,11 @@ class ExecutorFactoryTests(unittest.TestCase):
         executor = build_code_executor(config)
         self.assertIsInstance(executor, CodexExecutor)
 
+    def test_build_executor_backend_success(self) -> None:
+        config = _config()
+        backend = build_executor_backend(config)
+        self.assertIsInstance(backend, CodexExecutorBackend)
+
     def test_configures_wrapper_command(self) -> None:
         config = _config()
         self.assertEqual(
@@ -58,6 +73,12 @@ class ExecutorFactoryTests(unittest.TestCase):
         config.executor.apply_command = ["echo", "{spec_path}"]
         with self.assertRaises(ValueError):
             build_code_executor(config)
+
+    def test_build_executor_backend_invalid_type(self) -> None:
+        config = _config()
+        config.executor_backend.type = "unknown"
+        with self.assertRaises(ValueError):
+            build_executor_backend(config)
 
     def test_build_review_executor_requires_completion(self) -> None:
         config = _config()

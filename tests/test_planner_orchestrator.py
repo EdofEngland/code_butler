@@ -7,6 +7,7 @@ from unittest import mock
 
 from ai_clean.config import (
     AiCleanConfig,
+    ExecutorBackendConfig,
     ExecutorConfig,
     GitConfig,
     ReviewConfig,
@@ -21,6 +22,11 @@ def _make_config(base_dir: Path) -> AiCleanConfig:
     return AiCleanConfig(
         spec_backend=SpecBackendConfig(type="openspec"),
         executor=ExecutorConfig(type="codex", apply_command=["echo", "{spec_path}"]),
+        executor_backend=ExecutorBackendConfig(
+            type="codex",
+            command_prefix="/openspec-apply",
+            prompt_hint="/prompts:openspec-apply",
+        ),
         review=ReviewConfig(type="codex_review"),
         git=GitConfig(base_branch="main", refactor_branch="feature"),
         tests=TestsConfig(default_command="pytest -q"),

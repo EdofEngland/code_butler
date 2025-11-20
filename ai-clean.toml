@@ -6,6 +6,11 @@ type = "codex"
 # {spec_path} placeholder is replaced automatically with the absolute spec path.
 apply_command = ["scripts/apply_spec_wrapper.py", "{spec_path}"]
 
+[executor_backend]
+type = "codex"
+command_prefix = "/openspec-apply"
+prompt_hint = "/prompts:openspec-apply"
+
 [review]
 type = "codex_review"
 

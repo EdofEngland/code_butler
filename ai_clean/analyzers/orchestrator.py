@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable, Iterable, List, Sequence, Union
 
 from ai_clean.analyzers.docstrings import analyze_docstrings
-from ai_clean.analyzers.organize import analyze_organize
+from ai_clean.analyzers.organize.analyzer import analyze_organize
 from ai_clean.analyzers.structure import analyze_structure
 from ai_clean.models import Finding, FindingLocation
 
