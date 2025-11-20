@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Update `scripts/apply_spec_wrapper.py` logging behavior
+  - [x] 1.1.1 Edit `_run_real_command` so `subprocess.run` includes `capture_output=True` and `text=True` when invoking the resolved `openspec apply` command.
+  - [x] 1.1.2 After the subprocess completes, echo `proc.stdout` to `sys.stdout` and `proc.stderr` to `sys.stderr` (only if non-empty) before returning `proc.returncode`.
+  - [x] 1.1.3 Leave `_run_stub` unchanged—no code edits in the stub path.
+- [x] 1.2 Validate logging end-to-end
+  - [x] 1.2.1 Delete any prior `.ai-clean/specs/<plan>.yaml` and `.ai-clean/executions/<plan>.json` files for `organize:organize:2-organize-ai_clean-analyzers-organize` so the run is clean.
+  - [x] 1.2.2 Run `AI_CLEAN_USE_APPLY_STUB=1 ai-clean apply organize:organize:2-organize-ai_clean-analyzers-organize` from the repo root.
+  - [x] 1.2.3 Open `.ai-clean/executions/organize-organize-2-organize-ai_clean-analyzers-organize.json` and verify `metadata.apply.stdout` contains the stub message, demonstrating the wrapper forwarded stdout.
+- [x] 1.3 Run automated tests
+  - [x] 1.3.1 Execute `.venv/bin/python -m pytest -q`.
+  - [x] 1.3.2 Confirm the command exits with code 0.

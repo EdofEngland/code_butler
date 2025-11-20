@@ -6,11 +6,12 @@ only on standard library typing plus core models.
 
 from __future__ import annotations
 
-from typing import Protocol, Union
+from typing import Protocol, Union, runtime_checkable
 
 from .models import CleanupPlan, ExecutionResult, SpecChange
 
 
+@runtime_checkable
 class SpecBackend(Protocol):
     """Backend that converts plans into specs and writes them to disk."""
 
@@ -21,6 +22,7 @@ class SpecBackend(Protocol):
         """Persist the spec in the target directory and return the file path."""
 
 
+@runtime_checkable
 class CodeExecutor(Protocol):
     """Executor that applies a spec file and reports results."""
 
@@ -28,6 +30,7 @@ class CodeExecutor(Protocol):
         """Apply the spec at the given path and return an execution result."""
 
 
+@runtime_checkable
 class ReviewExecutor(Protocol):
     """Review-only executor that summarizes a change and risks."""
 

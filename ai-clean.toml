@@ -4,7 +4,7 @@ type = "openspec"
 [executor]
 type = "codex"
 # {spec_path} placeholder is replaced automatically with the absolute spec path.
-apply_command = ["bash", "-lc", "openspec apply {spec_path}"]
+apply_command = ["scripts/apply_spec_wrapper.py", "{spec_path}"]
 
 [review]
 type = "codex_review"
@@ -14,7 +14,7 @@ base_branch = "V0-Tool-Test"
 refactor_branch = "refactor/ai-clean"
 
 [tests]
-default_command = "pytest -q"
+default_command = ".venv/bin/python -m pytest -q"
 
 [limits]
 max_plan_files = 5

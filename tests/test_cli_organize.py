@@ -71,7 +71,7 @@ def test_organize_filters_by_max_files(
 
     monkeypatch.setattr(cli, "plan_from_finding", fake_plan_from_finding)
     monkeypatch.setattr(cli, "_run_apply_flow", lambda **kwargs: 0)
-    responses = iter(["1"])
+    responses = iter(["1", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(responses))
 
     exit_code = cli.main(["organize", "repo", "--max-files", "1"])
@@ -103,7 +103,7 @@ def test_organize_selects_ids_and_applies(
         cli, "_run_apply_flow", lambda **kwargs: apply_calls.append(kwargs) or 0
     )
 
-    responses = iter(["", "y", "n"])
+    responses = iter(["y", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(responses))
 
     exit_code = cli.main(["organize", "repo", "--ids", "org-1", "org-2"])

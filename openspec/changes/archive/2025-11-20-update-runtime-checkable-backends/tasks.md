@@ -1,0 +1,12 @@
+## 1. Implementation
+- [x] 1.1 Update `ai_clean/interfaces.py` to make plugin protocols runtime checkable
+  - [x] 1.1.1 Modify the import block to pull `runtime_checkable` from `typing` alongside `Protocol`.
+  - [x] 1.1.2 Add `@runtime_checkable` immediately above each protocol definition: `SpecBackend`, `CodeExecutor`, and `ReviewExecutor`.
+  - [x] 1.1.3 Ensure no other code changes are made in this file so the Protocol APIs remain identical apart from the decorator.
+- [x] 1.2 Verify `ai-clean apply` completes backend creation and reaches executor/test steps
+  - [x] 1.2.1 From the repo root on the configured refactor branch, run `ai-clean apply "organize:organize:2-organize-ai_clean-analyzers-organize"`.
+  - [x] 1.2.2 Confirm the command progresses past spec backend creation (no TypeError), triggers the Codex executor, and runs the configured tests.
+  - [x] 1.2.3 Capture/inspect the resulting `.ai-clean/specs/` and `.ai-clean/executions/` entries to verify artifacts were produced.
+- [x] 1.3 Run automated tests to ensure no regressions
+  - [x] 1.3.1 Execute `pytest -q` from the repo root.
+  - [x] 1.3.2 Confirm the test suite exits with status 0.
