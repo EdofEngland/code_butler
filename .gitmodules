@@ -1,0 +1,3 @@
+[submodule "thirdparty_learning/openspec"]
+	path = thirdparty_learning/openspec
+	url = https://github.com/Fission-AI/OpenSpec.git

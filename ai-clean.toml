@@ -1,17 +1,69 @@
+# ai-clean configuration: mirrors the Phase 1 system sketch (plan -> spec -> apply)
+
 [spec_backend]
-type = "openspec"
+# Butler-managed backend writes specs under the `.ai-clean/specs` directory
+type = "butler"
+default_batch_group = "default"
 
 [executor]
-type = "codex"
-# {spec_path} placeholder is replaced automatically with the absolute spec path.
-apply_command = ["bash", "-lc", "openspec apply {spec_path}"]
+# Codex shell wrapper applies specs using the Codex CLI binary
+type = "codex_shell"
+binary = "codex"
+apply_args = ["apply"]
 
 [review]
+# Codex-powered reviewer summarizes risks after execution
 type = "codex_review"
+mode = "summarize-and-risk"
 
 [git]
+# Git guardrails for Codex apply flows
 base_branch = "main"
 refactor_branch = "refactor/ai-clean"
 
 [tests]
+# Default test command to run after `/apply`
 default_command = "pytest -q"
+
+[analyzers.duplicate]
+# Duplicate analyzer settings used by `/analyze`
+window_size = 5          # How many consecutive lines form a window
+min_occurrences = 2      # Minimum occurrences required before reporting
+ignore_dirs = [".git", "__pycache__", ".venv"]
+
+[analyzers.structure]
+# Structure analyzer thresholds for `/analyze`
+max_file_lines = 400       # Files above this many lines trigger findings
+max_function_lines = 60    # Functions longer than this trigger findings
+ignore_dirs = [".git", "__pycache__", ".venv"]
+
+[analyzers.docstring]
+# Docstring analyzer controls for `/analyze`
+min_docstring_length = 32     # Minimum characters before a docstring counts as substantive
+min_symbol_lines = 5          # Symbols shorter than this are ignored when important_symbols_only = true
+weak_markers = ["TODO", "fixme", "tbd"]
+important_symbols_only = true
+ignore_dirs = [".git", "__pycache__", ".venv"]
+
+[analyzers.organize]
+# Organize analyzer thresholds
+min_group_size = 2
+max_group_size = 5
+max_groups = 5
+ignore_dirs = [".git", "__pycache__", ".venv"]
+
+[analyzers.advanced]
+# Advanced Codex analyzer settings (Phase 2.6)
+max_files = 3
+max_suggestions = 5
+prompt_template = "Suggest small, local cleanup changes only; no API redesigns.\nExisting findings:\n{findings}\n\nSnippets:\n{snippets}"
+codex_model = "gpt-4o-mini"
+temperature = 0.2
+ignore_dirs = [".git", "__pycache__", ".venv"]
+[analyzers.docstring]
+# Docstring analyzer controls for `/analyze`
+min_docstring_length = 32     # Minimum characters before a docstring counts as substantive
+min_symbol_lines = 5          # Symbols shorter than this are ignored when important_symbols_only = true
+weak_markers = ["TODO", "fixme", "tbd"]
+important_symbols_only = true
+ignore_dirs = [".git", "__pycache__", ".venv"]

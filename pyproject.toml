@@ -5,19 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ai-clean"
 version = "0.1.0"
-description = "CLI for analyzing, planning, and applying structured code cleanups."
+description = "ButlerSpec-governed cleanup assistant CLI skeleton"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
 dependencies = [
-    "tomli>=1.1; python_version<'3.11'",
-    "PyYAML>=6.0",
-]
-authors = [
-    { name = "AI Clean Maintainers" },
+    "pydantic>=2.6,<3",
 ]
 
+[project.optional-dependencies]
+yaml = ["pyyaml>=6"]
+
 [project.scripts]
-ai-clean = "ai_clean.cli:main"
+"ai-clean" = "ai_clean.cli:main"
 
 [tool.black]
 line-length = 88
