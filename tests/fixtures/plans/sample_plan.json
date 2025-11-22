@@ -1,0 +1,23 @@
+{
+  "id": " sample-plan ",
+  "finding_id": "finding-123",
+  "title": "  Harden foo.py tests  ",
+  "intent": "  Harden foo.py tests to catch regressions  ",
+  "steps": [
+    "  Add regression test for foo.py  ",
+    "Refactor helper   ",
+    " "
+  ],
+  "constraints": [
+    "  Touch only src/foo.py  ",
+    "Keep patch under 40 lines",
+    ""
+  ],
+  "tests_to_run": [
+    "  pytest tests/test_foo.py  "
+  ],
+  "metadata": {
+    "target_file": "  src/foo.py  ",
+    "notes": "Example metadata entry."
+  }
+}

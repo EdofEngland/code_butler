@@ -17,6 +17,11 @@ It focuses on Implement a backend factory: while keeping Codex as the execution 
 
 - For v0, `butler` is the **only** supported backend.
 
+## Configuration Contract & Non-goals
+- The `[spec_backend]` table MUST define `type` and `specs_dir`. Missing, empty, or whitespace-only `type` values default to the same “Unsupported spec backend: <value>” error so configuration bugs are surfaced before backend construction.
+- `specs_dir` continues to drive `SpecBackendHandle.specs_dir`; Phase 4.3 SHALL not invent defaults or mutate filesystem paths outside what `ai-clean.toml` provides.
+- Only the literal string `butler` is recognized in v0; adding additional backend identifiers or default fallbacks is explicitly out of scope and requires a new proposal.
+
 ## Impact / Risks
 - Unlocks later phases that depend on Backend Factory & Configuration.
 - Reinforces ButlerSpec guardrails: one-plan-per-file, specs on disk, Codex apply pipeline.

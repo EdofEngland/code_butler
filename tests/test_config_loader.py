@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 
 from ai_clean.config import load_config
 from ai_clean.factories import get_executor, get_review_executor, get_spec_backend
+from ai_clean.models import CleanupPlan
+from ai_clean.paths import default_spec_path
 
 
 def _write_config(path: Path) -> None:
@@ -78,16 +80,30 @@ class ConfigLoaderTests(unittest.TestCase):
 
             spec_handle = get_spec_backend(config)
             self.assertEqual(spec_handle.specs_dir, config.spec_backend.specs_dir)
-            self.assertRaises(
-                NotImplementedError, spec_handle.backend.plan_to_spec, object()
+            default_path = default_spec_path("spec-demo")
+            self.assertTrue(str(default_path).endswith(".butler.yaml"))
+            self.assertEqual(spec_handle.specs_dir, default_path.parent.resolve())
+
+            plan = CleanupPlan(
+                id="plan-1",
+                finding_id="finding-1",
+                title="Demo plan",
+                intent="Fix foo.py",
+                steps=["Do work"],
+                constraints=["Stay focused"],
+                tests_to_run=["pytest -q"],
+                metadata={"target_file": "src/foo.py"},
             )
+            spec = spec_handle.backend.plan_to_spec(plan)
+            self.assertEqual(spec.plan_id, plan.id)
+            self.assertEqual(spec.target_file, "src/foo.py")
 
             executor_handle = get_executor(config)
             self.assertEqual(executor_handle.results_dir, config.executor.results_dir)
             self.assertRaises(
                 NotImplementedError,
                 executor_handle.executor.apply_spec,
-                Path("spec.yaml"),
+                Path("spec.butler.yaml"),
             )
 
             review_handle = get_review_executor(config)

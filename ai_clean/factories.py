@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence
 
 from ai_clean.config import (
     AiCleanConfig,
@@ -20,9 +20,10 @@ from ai_clean.interfaces import (
     SpecBackend,
     StructuredReview,
 )
+from ai_clean.spec_backends import ButlerSpecBackend
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from ai_clean.models import ButlerSpec, CleanupPlan, ExecutionResult
+    from ai_clean.models import CleanupPlan, ExecutionResult
 
 
 @dataclass(frozen=True)
@@ -55,23 +56,6 @@ class _CodexPromptRunner:
         )
 
 
-class _ButlerSpecBackend:
-    """Placeholder backend wired to Butler defaults."""
-
-    def __init__(self, config: SpecBackendConfig) -> None:
-        self._config = config
-
-    def plan_to_spec(
-        self, plan: "CleanupPlan"
-    ) -> "ButlerSpec":  # pragma: no cover - stub
-        raise NotImplementedError("Spec generation is implemented in later milestones.")
-
-    def write_spec(
-        self, spec: "ButlerSpec", directory: Path
-    ) -> Path:  # pragma: no cover - stub
-        raise NotImplementedError("Spec writing is implemented in later milestones.")
-
-
 class _CodexShellExecutor:
     """Placeholder executor that documents Codex shell usage."""
 
@@ -99,8 +83,17 @@ class _CodexReviewExecutor:
         raise NotImplementedError("Review logic is implemented in later milestones.")
 
 
+BACKEND_BUILDERS: dict[str, Callable[[SpecBackendConfig], SpecBackend]] = {
+    "butler": ButlerSpecBackend,
+}
+
+
 def get_spec_backend(config: AiCleanConfig) -> SpecBackendHandle:
-    backend = _ButlerSpecBackend(config.spec_backend)
+    backend_type = (config.spec_backend.type or "").strip().lower()
+    builder = BACKEND_BUILDERS.get(backend_type)
+    if builder is None:
+        raise ValueError(f"Unsupported spec backend: {backend_type or '<empty>'}")
+    backend = builder(config.spec_backend)
     return SpecBackendHandle(backend=backend, specs_dir=config.spec_backend.specs_dir)
 
 

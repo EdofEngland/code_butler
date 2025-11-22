@@ -78,7 +78,7 @@ def main() -> None:
         str(default_plan_path(plan.id)) == ".ai-clean/plans/plan-1.json"
     ), "Unexpected plan path"
     assert (
-        str(default_spec_path(spec.id)) == ".ai-clean/specs/spec-1.yaml"
+        str(default_spec_path(spec.id)) == ".ai-clean/specs/spec-1.butler.yaml"
     ), "Unexpected spec path"
     assert (
         str(default_result_path(plan.id)) == ".ai-clean/results/plan-1.json"

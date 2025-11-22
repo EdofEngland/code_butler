@@ -422,6 +422,103 @@ See `openspec/changes/phase-1-IMPLEMENTATION_ORDER.md` for dependencies and sequ
 
   * Small, deterministic, and human-readable.
 
+#### Canonical plan JSON
+
+Plans persisted to `.ai-clean/plans/{plan_id}.json` follow a canonical schema so ButlerSpec conversion receives deterministic inputs. Every file MUST contain:
+
+- `id` – plan identifier with surrounding whitespace trimmed.
+- `intent` – trimmed human-readable description of the change.
+- `steps` – ordered, trimmed array of ≤25 summary strings; blank entries are removed.
+- `constraints` – ordered, trimmed array mirroring `steps` canonicalization.
+- `tests_to_run` – ordered, trimmed array; may be empty but never contain blanks.
+- `metadata` – dict limited to `PLAN_METADATA_LIMIT = 32 * 1024` bytes after serialization and including exactly one non-empty `target_file` string.
+
+Unknown top-level keys are rejected before persistence, guaranteeing that ButlerSpec receives predictable input. Canonical layout example:
+
+```json
+{
+  "id": "phase-4-plan-1",
+  "intent": "Tighten tests in src/foo.py",
+  "steps": [
+    "Add regression test for buggy branch",
+    "Refactor helper in src/foo.py"
+  ],
+  "constraints": [
+    "Touch only src/foo.py",
+    "Keep diff under 50 lines"
+  ],
+  "tests_to_run": [
+    "pytest tests/foo_test.py"
+  ],
+  "metadata": {
+    "target_file": "src/foo.py",
+    "notes": "Any other metadata stays below 32 KB."
+  }
+}
+```
+
+#### ButlerSpec schema
+
+`ButlerSpecBackend` emits deterministic specs with the following dataclass fields:
+
+- **Required**: `id` (must equal `f"{plan.id}-spec"` after trimming), `plan_id`, `target_file`, `intent`, `actions` (ordered list of structured entries), `model` (enum: `"codex"` in Phase 4.1), and `metadata` (detached dict).
+- **Optional**: `batch_group` defaults to `SpecBackendConfig.default_batch_group` but may be explicitly set to `None`.
+
+All metadata from the plan is copied, then augmented with `plan_title`, normalized `constraints`, and `tests_to_run` arrays so executors never touch the JSON plan. Example YAML referencing the canonical plan:
+
+```yaml
+id: phase-4-plan-1-spec
+plan_id: phase-4-plan-1
+target_file: src/foo.py
+intent: Tighten tests in src/foo.py
+model: codex
+batch_group: default
+actions:
+  - type: plan_step
+    index: 1
+    summary: Add regression test for buggy branch
+    payload: null
+  - type: plan_step
+    index: 2
+    summary: Refactor helper in src/foo.py
+    payload: null
+metadata:
+  plan_title: Tighten tests in src/foo.py
+  constraints:
+    - Touch only src/foo.py
+    - Keep diff under 50 lines
+  tests_to_run:
+    - pytest tests/foo_test.py
+  target_file: src/foo.py
+  notes: Any other metadata stays below 32 KB.
+```
+
+#### Phase 4.1 action vocabulary
+
+The only supported action entry in Phase 4.1 is `plan_step`:
+
+```jsonc
+{
+  "type": "plan_step",      // literal string
+  "index": 1,               // 1-based, ordered sequentially
+  "summary": "Trimmed text",
+  "payload": null           // reserved for later expansion
+}
+```
+
+Reserved future identifiers (`edit_block`, `insert_docstring`, `rewrite_tests`, etc.) MUST NOT appear until later phases introduce them, ensuring executor models always read a deterministic schema.
+
+#### Governance and error catalog
+
+`ButlerSpecBackend` enforces these guardrails with deterministic `ValueError` strings:
+
+- Missing or blank `metadata.target_file` → `ValueError("ButlerSpec plans must declare exactly one target_file")`.
+- Conflicting target hints (`target_file_candidates`, multiple entries, etc.) → `ValueError("ButlerSpec plans must not declare multiple target files")`.
+- Metadata over 32 KB (see `PLAN_METADATA_LIMIT`) → `ValueError("ButlerSpec metadata exceeds the 32 KB limit")`.
+- Intent/target mismatch (intent text fails to mention or describe the computed `target_file`) → `ValueError(f"CleanupPlan intent must describe work in target_file '{target_file}'")`.
+
+Reference this catalog from backend docstrings so implementers raise precisely these messages.
+
 ---
 
 ### Phase 4.2 – Writing ButlerSpec Files
@@ -436,6 +533,55 @@ See `openspec/changes/phase-1-IMPLEMENTATION_ORDER.md` for dependencies and sequ
 
   * Each spec file corresponds to a **single, small change** in a single file.
   * No multi-topic specs.
+
+#### ButlerSpec YAML schema
+
+ButlerSpec files are UTF-8 encoded YAML documents with keys written in a fixed order using two-space indentation. Writers MUST emit the following top-level keys in order: `id`, `plan_id`, `target_file`, `intent`, `model`, `batch_group`, `actions`, `metadata`. Actions are arrays of maps with keys ordered `type`, `index`, `summary`, `payload` and serialized one per line for readability. Metadata keys are sorted so reviewers see deterministic diffs, and every file ends with a single trailing newline with no tabs or trailing spaces. Example output produced by the backend serializer:
+
+```yaml
+id: phase-4-plan-1-spec
+plan_id: phase-4-plan-1
+target_file: src/foo.py
+intent: Tighten tests in src/foo.py
+model: codex
+batch_group: default
+actions:
+  - type: plan_step
+    index: 1
+    summary: Add regression test for buggy branch
+    payload: null
+  - type: plan_step
+    index: 2
+    summary: Refactor helper in src/foo.py
+    payload: null
+metadata:
+  constraints:
+    - Touch only src/foo.py
+    - Keep diff under 50 lines
+  notes: Any other metadata stays below 32 KB.
+  plan_title: Tighten tests in src/foo.py
+  target_file: src/foo.py
+  tests_to_run:
+    - pytest tests/foo_test.py
+```
+
+#### Guardrails enforced by `write_spec`
+
+Persistence reuses the Phase 4.1 helpers to re-validate specs before they hit disk:
+
+- `ensure_single_target` guarantees exactly one `target_file`.
+- `normalize_text_array` ensures the upstream plan generates ≤25 steps, and `write_spec` revalidates that the derived actions respect the same limit.
+- `assert_metadata_size` enforces the 32 KB metadata ceiling.
+
+Any guardrail violation raises the errors enumerated in `#governance-and-error-catalog`, preventing partial writes.
+
+#### Filesystem expectations
+
+Specs live under `.ai-clean/specs/` by default, but `write_spec` accepts any `Path` and always calls `mkdir(parents=True, exist_ok=True)` so missing directories are created automatically. Filenames follow `{spec.id}.butler.yaml` regardless of directory. When a file already exists, the backend reads its bytes; identical payloads skip the write (idempotent) while mismatches overwrite the file after logging a warning. The serializer never writes beyond 32 KB, avoids tabs, and always appends a trailing newline.
+
+#### Phase 4.2 non-goals
+
+Batching, compression, remote storage layers, or YAML signing/checksums are intentionally out of scope for this change. Later proposals will explore signing, hashing, or synchronization behaviors once deterministic local persistence is proven.
 
 ---
 
@@ -452,6 +598,17 @@ See `openspec/changes/phase-1-IMPLEMENTATION_ORDER.md` for dependencies and sequ
     * Raise a friendly error: “Unsupported spec backend: X”.
 
 * For v0, `butler` is the **only** supported backend.
+
+`get_spec_backend` instantiates `ButlerSpecBackend` whenever `[spec_backend]` declares `type = "butler"`; any other value (including blank/whitespace) raises `ValueError("Unsupported spec backend: <value>")`. Additional identifiers require a future proposal before being added to the builder map, keeping v0 deterministic.
+
+Example configuration:
+
+```toml
+[spec_backend]
+type = "butler"
+default_batch_group = "default"
+specs_dir = ".ai-clean/specs"
+```
 
 ---
 

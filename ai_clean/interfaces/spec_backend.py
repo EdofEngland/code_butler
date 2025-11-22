@@ -22,7 +22,7 @@ class SpecBackend(Protocol):
     def plan_to_spec(self, plan: "CleanupPlan") -> "ButlerSpec":
         """Convert a CleanupPlan into a ButlerSpec without side effects."""
 
-    def write_spec(self, spec: "ButlerSpec", directory: Path) -> Path:
+    def write_spec(self, spec: "ButlerSpec", directory: Path | None = None) -> Path:
         """Persist the ButlerSpec under the provided directory and return the path."""
 
 
@@ -35,8 +35,10 @@ class BaseSpecBackend(ABC):
     ) -> "ButlerSpec":  # pragma: no cover - abstract
         raise NotImplementedError
 
-    def write_spec(self, spec: "ButlerSpec", directory: Path) -> Path:
-        spec_path = directory / f"{spec.id}.yaml"
+    def write_spec(self, spec: "ButlerSpec", directory: Path | None = None) -> Path:
+        if directory is None:
+            raise ValueError("BaseSpecBackend.write_spec requires an output directory")
+        spec_path = directory / f"{spec.id}.butler.yaml"
         directory.mkdir(parents=True, exist_ok=True)
         spec_path.write_text(spec.to_yaml())
         return spec_path

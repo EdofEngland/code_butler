@@ -20,7 +20,7 @@ def default_plan_path(plan_id: str) -> Path:
 def default_spec_path(spec_id: str) -> Path:
     """Return the default on-disk location for a ButlerSpec YAML file."""
 
-    return default_metadata_root() / "specs" / f"{spec_id}.yaml"
+    return default_metadata_root() / "specs" / f"{spec_id}.butler.yaml"
 
 
 def default_result_path(plan_id: str) -> Path:

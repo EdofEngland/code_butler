@@ -31,7 +31,7 @@ Helper functions MUST describe how to store serialized artifacts under `.ai-clea
 
 #### Scenario: Default path helpers point to ButlerSpec layout
 - **WHEN** `default_plan_path("abc")` and `default_spec_path("spec-1")` are called
-- **THEN** they return `.ai-clean/plans/abc.json` and `.ai-clean/specs/spec-1.yaml` (or similar) without touching the filesystem.
+- **THEN** they return `.ai-clean/plans/abc.json` and `.ai-clean/specs/spec-1.butler.yaml` (or similar) without touching the filesystem.
 
 ### Requirement: Guardrails communicated and tested
 Documentation MUST reinforce the “data-only” boundary and include a deterministic roundtrip example.

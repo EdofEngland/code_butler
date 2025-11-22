@@ -51,9 +51,10 @@ class PrintExecutor:
 
     def apply_spec(self, spec_path: Path) -> ExecutionResult:
         print(f"Applying spec at {spec_path}")
+        spec_id = spec_path.name.removesuffix(".butler.yaml")
         return ExecutionResult(
-            spec_id=spec_path.stem,
-            plan_id=spec_path.stem.replace("spec-", ""),
+            spec_id=spec_id,
+            plan_id=spec_id.replace("spec-", ""),
             success=True,
             tests_passed=None,
             stdout="dry-run",
@@ -62,14 +63,14 @@ class PrintExecutor:
 
 
 class SingleBatchRunner:
-    """BatchRunner that reuses the code executor for each YAML file."""
+    """BatchRunner that reuses the code executor for each `.butler.yaml` file."""
 
     def __init__(self, executor: CodeExecutor) -> None:
         self._executor = executor
 
     def apply_batch(self, spec_dir: Path, batch_group: str) -> List[ExecutionResult]:
         results: List[ExecutionResult] = []
-        for spec_path in spec_dir.glob("*.yaml"):
+        for spec_path in spec_dir.glob("*.butler.yaml"):
             results.append(self._executor.apply_spec(spec_path))
         return results
 
