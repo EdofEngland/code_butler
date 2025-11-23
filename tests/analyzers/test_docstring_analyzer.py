@@ -55,6 +55,7 @@ class DocstringAnalyzerTests(unittest.TestCase):
             weak_finding = next(f for f in first if f.category == "weak_docstring")
             self.assertIn("weak_marker", weak_finding.description)
             self.assertEqual(weak_finding.metadata["symbol_type"], "function")
+            self.assertEqual(weak_finding.metadata["symbol_name"], "weak_marker")
             self.assertTrue(
                 weak_finding.metadata["docstring_preview"].startswith("TODO")
             )

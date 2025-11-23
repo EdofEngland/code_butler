@@ -34,6 +34,10 @@ class CleanupAdvancedCliTests(unittest.TestCase):
                 )
         self.assertEqual(exit_code, 0)
         self.assertIn(sample.id, stdout.getvalue())
+        self.assertIn(
+            f"Use 'ai-clean plan {sample.id}' to create a plan.", stdout.getvalue()
+        )
+        self.assertIn("analysis-only", stdout.getvalue())
 
     def test_json_output(self) -> None:
         sample = _sample_finding()
@@ -59,6 +63,8 @@ class CleanupAdvancedCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload[0]["id"], sample.id)
+        # JSON mode should not include guidance text.
+        self.assertNotIn("ai-clean plan", stdout.getvalue())
 
     def test_defaults_config_to_root(self) -> None:
         with (

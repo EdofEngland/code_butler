@@ -27,6 +27,7 @@ class _FileEntry:
 @dataclass(frozen=True)
 class _SymbolRecord:
     qualified_name: str
+    symbol_name: str
     symbol_type: str
     start_line: int
     end_line: int
@@ -62,6 +63,7 @@ def find_docstring_gaps(root: Path, settings: DocstringAnalyzerConfig) -> list[F
                     ),
                     start_line=1,
                     end_line=1,
+                    symbol_name=entry.relative_path.stem,
                     symbol_type="module",
                     docstring_preview="",
                     lines_of_code=len(lines),
@@ -96,6 +98,7 @@ def find_docstring_gaps(root: Path, settings: DocstringAnalyzerConfig) -> list[F
                     relative_path=entry.relative_path,
                     qualified_name=record.qualified_name,
                     description=description,
+                    symbol_name=record.symbol_name,
                     start_line=record.start_line,
                     end_line=record.end_line,
                     symbol_type=record.symbol_type,
@@ -168,6 +171,7 @@ class _DocstringCollector(ast.NodeVisitor):
         self.results.append(
             _SymbolRecord(
                 qualified_name=".".join(qualified_parts),
+                symbol_name=name,
                 symbol_type=symbol_type,
                 start_line=start,
                 end_line=end,
@@ -219,6 +223,7 @@ def _build_finding(
     description: str,
     start_line: int,
     end_line: int,
+    symbol_name: str,
     symbol_type: str,
     docstring_preview: str,
     lines_of_code: int,
@@ -237,6 +242,7 @@ def _build_finding(
         ],
         metadata={
             "symbol_type": symbol_type,
+            "symbol_name": symbol_name,
             "docstring_preview": docstring_preview,
             "lines_of_code": lines_of_code,
             "qualified_name": qualified_name,

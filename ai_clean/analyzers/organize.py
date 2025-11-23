@@ -86,6 +86,7 @@ def propose_organize_groups(
         metadata = {
             "topic": topic,
             "members": [member.as_posix() for member in available],
+            "files": [member.as_posix() for member in available],
         }
         findings.append(
             Finding(

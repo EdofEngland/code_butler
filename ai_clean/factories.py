@@ -304,8 +304,6 @@ class _CodexReviewExecutor:
             missing.append("spec_id")
         if not exec_result.plan_id:
             missing.append("plan_id")
-        if exec_result.tests_passed is None:
-            missing.append("tests_passed")
         if missing:
             raise ValueError(
                 f"ExecutionResult missing required fields: {', '.join(missing)}"
@@ -317,7 +315,7 @@ class _CodexReviewExecutor:
         base_instruction = (
             "Summarize these changes, flag risks, and ensure plan constraints are "
             "respected. Provide advisory notes only. Do NOT propose or apply code "
-            "modifications."
+            "modifications or new tasks."
         )
         diff_text = diff if diff.strip() else "(no code changes provided)"
         constraints = plan.constraints or []
@@ -325,6 +323,9 @@ class _CodexReviewExecutor:
         target_file = plan.metadata.get("target_file") if plan.metadata else None
         stdout_snippet = self._truncate(exec_result.stdout)
         stderr_snippet = self._truncate(exec_result.stderr)
+        tests_status = (
+            "unknown" if exec_result.tests_passed is None else exec_result.tests_passed
+        )
         return "\n".join(
             [
                 f"[mode={self._config.mode}] Codex review request",
@@ -341,7 +342,7 @@ class _CodexReviewExecutor:
                 "",
                 "Execution Result:",
                 f"- success: {exec_result.success}",
-                f"- tests_passed: {exec_result.tests_passed}",
+                f"- tests_passed: {tests_status}",
                 f"- stdout: {stdout_snippet}",
                 f"- stderr: {stderr_snippet}",
                 "",

@@ -74,10 +74,12 @@ class OrganizeAnalyzerTests(unittest.TestCase):
                 self.assertGreaterEqual(count, settings.min_group_size)
                 self.assertLessEqual(count, settings.max_group_size)
                 members = {Path(member) for member in finding.metadata["members"]}
+                files = {Path(entry) for entry in finding.metadata.get("files", [])}
                 self.assertEqual(
                     members,
                     {location.path for location in finding.locations},
                 )
+                self.assertEqual(members, files)
                 self.assertTrue(assigned.isdisjoint(members))
                 assigned.update(members)
 
