@@ -34,8 +34,8 @@ max_changed_lines_per_plan = 200
 
 [analyzers.duplicate]
 # Duplicate analyzer settings used by `/analyze`
-window_size = 5          # How many consecutive lines form a window
-min_occurrences = 2      # Minimum occurrences required before reporting
+window_size = 10          # How many consecutive lines form a window
+min_occurrences = 5      # Minimum occurrences required before reporting
 ignore_dirs = [".git", "__pycache__", ".venv"]
 
 [analyzers.structure]
