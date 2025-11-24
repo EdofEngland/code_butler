@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = [
     "pydantic>=2.6,<3",
+    "PyYAML>=6",
 ]
 
 [project.optional-dependencies]
@@ -31,3 +32,7 @@ line-length = 88
 target-version = "py311"
 select = ["E", "F", "I"]
 # E = pycodestyle errors, F = pyflakes, I = isort (ruff can handle imports too!)
+
+[tool.setuptools.packages.find]
+include = ["ai_clean", "ai_clean.*"]
+exclude = ["openspec*", "thirdparty_learning*"]
