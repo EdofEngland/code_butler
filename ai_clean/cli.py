@@ -243,10 +243,6 @@ def main(argv: list[str] | None = None) -> int:
     return handler(args)
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-
 def _run_analyze_command(args: argparse.Namespace) -> int:
     """Run analyzers in read-only mode for the target repository.
 
@@ -1308,3 +1304,7 @@ def _display_path(path: Path, root: Path) -> str:
         return path.resolve().relative_to(root).as_posix()
     except ValueError:
         return path.as_posix()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
