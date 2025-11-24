@@ -7,7 +7,7 @@ Invocation: `codex /butler-exec <SPEC_PATH>`
 - Auth/environment: handled by Codex CLI. Do not request credentials; do not open browsers.
 
 Execution steps:
-1) Read the ButlerSpec YAML from `<SPEC_PATH>`. If the file is missing or unreadable, respond with `Error: spec file not found or unreadable` and stop.
+1) Read the ButlerSpec YAML from `<SPEC_PATH>`. If the file is missing or unreadable, respond with `Error: spec file not found or unreadable` and stop immediately. Do NOT search for other specs, scan the repo, or apply any actions when the requested file is absent.
 2) Validate guardrails before applying:
    - Spec MUST declare exactly one `target_file` and no conflicting targets.
    - Spec MUST have `actions` length between 1 and 25.

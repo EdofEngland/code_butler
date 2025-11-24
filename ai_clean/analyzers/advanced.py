@@ -50,6 +50,19 @@ def collect_advanced_cleanup_ideas(
     config: AiCleanConfig,
     runner: CodexPromptRunner,
 ) -> list[Finding]:
+    """Generate Codex-backed cleanup suggestions anchored to prior findings.
+
+    Resolves ``root`` and selects candidate files from ``existing_findings`` within
+    ignore/max limits, renders a prompt with summaries and code snippets, enforces
+    the guardrail sentence, and runs it through ``runner`` with attachments. Codex
+    responses are decoded from JSON and filtered to drop malformed entries,
+    suggestions outside the selected paths, disallowed change types, or any beyond
+    the max suggestion limit. Accepted suggestions are converted to ``Finding``
+    instances enriched with Codex metadata (prompt hash, raw response, change
+    type, target path, and dropped-suggestion summary) and returned; if no files
+    are selected or no suggestions survive filtering, an empty list is returned.
+    Assumes ``runner`` yields a JSON array of suggestion payloads.
+    """
     advanced_config = config.analyzers.advanced
     root = root.resolve()
     candidates = _select_candidate_files(
