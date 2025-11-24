@@ -8,7 +8,7 @@ default_batch_group = "default"
 [executor]
 # Codex shell wrapper applies specs using the Codex CLI binary
 type = "codex_shell"
-binary = "codex"
+binary = "/opt/homebrew/bin/codex"
 apply_args = ["apply"]
 
 [review]
