@@ -67,10 +67,3 @@ prompt_template = "Suggest small, local cleanup changes only; no API redesigns.\
 codex_model = "gpt-4o-mini"
 temperature = 0.2
 ignore_dirs = [".git", "__pycache__", ".venv"]
-[analyzers.docstring]
-# Docstring analyzer controls for `/analyze`
-min_docstring_length = 32     # Minimum characters before a docstring counts as substantive
-min_symbol_lines = 5          # Symbols shorter than this are ignored when important_symbols_only = true
-weak_markers = ["TODO", "fixme", "tbd"]
-important_symbols_only = true
-ignore_dirs = [".git", "__pycache__", ".venv"]
