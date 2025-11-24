@@ -251,7 +251,7 @@ def load_config(path: Path | None = None) -> AiCleanConfig:
         apply_args=tuple(executor_section.get("apply_args", ["apply"])),
         results_dir=results_dir,
     )
-    if executor.type != "codex_shell":
+    if executor.type != "manual":
         raise ValueError(f"Unsupported executor.type: {executor.type}")
 
     review = ReviewConfig(

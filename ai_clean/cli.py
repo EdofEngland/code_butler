@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import sys
 from pathlib import Path
 from typing import Callable
@@ -11,7 +12,6 @@ from typing import Callable
 from ai_clean.analyzers import analyze_repo
 from ai_clean.analyzers.docstrings import find_docstring_gaps
 from ai_clean.analyzers.organize import propose_organize_groups
-from ai_clean.commands.advanced_cleanup import run_advanced_cleanup
 from ai_clean.commands.apply import apply_plan
 from ai_clean.commands.plan import run_plan_for_finding
 from ai_clean.config import load_config
@@ -29,7 +29,10 @@ _COMMAND_SPECS: tuple[tuple[str, str], ...] = (
     ("clean", "Guided basic cleanup for common findings"),
     ("annotate", "Generate docstring improvement plans"),
     ("organize", "Group related files and propose organize moves"),
-    ("cleanup-advanced", "Run advanced Codex-driven cleanup flows"),
+    (
+        "cleanup-advanced",
+        "Disabled: run Codex /cleanup-advanced slash command manually",
+    ),
     ("plan", "Author a new ButlerSpec plan for a specific finding"),
     ("apply", "Apply a ButlerSpec plan using Codex"),
     ("changes-review", "Review executed plans and summarize risks"),
@@ -353,6 +356,10 @@ def _run_clean_command(args: argparse.Namespace) -> int:
                 print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
                 overall_failure = True
                 continue
+            except ValueError as exc:
+                print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
+                overall_failure = True
+                continue
             except Exception as exc:  # pragma: no cover - defensive
                 print(
                     f"Unexpected error while applying {plan.id}: {exc}", file=sys.stderr
@@ -360,9 +367,9 @@ def _run_clean_command(args: argparse.Namespace) -> int:
                 overall_failure = True
                 continue
 
-            _print_apply_summary(plan.id, spec_path, result)
-            if not result.success:
-                overall_failure = True
+    _print_apply_summary(plan.id, spec_path, result)
+    if not result.success and not _manual_execution_required(result):
+        overall_failure = True
 
     return 1 if overall_failure else 0
 
@@ -475,15 +482,19 @@ def _run_annotate_command(args: argparse.Namespace) -> int:
             print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
             overall_failure = True
             continue
+        except ValueError as exc:
+            print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
+            overall_failure = True
+            continue
         except Exception as exc:  # pragma: no cover - defensive
             print(f"Unexpected error while applying {plan.id}: {exc}", file=sys.stderr)
             overall_failure = True
             continue
 
-        _print_apply_summary(plan.id, spec_path, result)
-        applied += 1
-        if not result.success:
-            overall_failure = True
+    _print_apply_summary(plan.id, spec_path, result)
+    applied += 1
+    if not result.success and not _manual_execution_required(result):
+        overall_failure = True
 
     print(f"Planned {len(created_plans)} docstring(s); applied {applied} plan(s).")
     return 1 if overall_failure else 0
@@ -585,6 +596,11 @@ def _run_organize_command(args: argparse.Namespace) -> int:
                 overall_failure = True
                 created_plans.append((plan, plan_path))
                 continue
+            except ValueError as exc:
+                print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
+                overall_failure = True
+                created_plans.append((plan, plan_path))
+                continue
             except Exception as exc:  # pragma: no cover - defensive
                 print(
                     f"Unexpected error while applying {plan.id}: {exc}", file=sys.stderr
@@ -596,7 +612,7 @@ def _run_organize_command(args: argparse.Namespace) -> int:
             _print_apply_summary(plan.id, spec_path, result)
             applied += 1
             created_plans.append((plan, plan_path))
-            if not result.success:
+            if not result.success and not _manual_execution_required(result):
                 overall_failure = True
 
     if created_plans:
@@ -688,33 +704,15 @@ def _run_changes_review_command(args: argparse.Namespace) -> int:
 
 
 def _run_cleanup_advanced_command(args: argparse.Namespace) -> int:
-    root = Path(args.root).expanduser().resolve()
-    config_path = _resolve_config_path(root, args.config)
-    findings_path = Path(args.findings_json).expanduser().resolve()
-    try:
-        findings = run_advanced_cleanup(root, config_path, findings_path)
-    except FileNotFoundError as exc:
-        print(f"Failed to load configuration or findings: {exc}", file=sys.stderr)
-        return 1
-    except Exception as exc:  # pragma: no cover - defensive
-        print(
-            f"Unexpected error while running advanced cleanup: {exc}", file=sys.stderr
-        )
-        return 1
-
-    findings = sorted(findings, key=lambda item: (item.category, item.id))
-    if args.json:
-        return _print_findings(findings, True)
-
-    print(
-        "Advanced cleanup is analysis-only; "
-        "use 'ai-clean plan <FINDING_ID>' to create a plan."
+    payload_path = Path(args.findings_json).expanduser().resolve()
+    command = f"codex /cleanup-advanced {shlex.quote(str(payload_path))}"
+    message = (
+        "Advanced cleanup is disabled: Codex integration requires the "
+        "/cleanup-advanced slash command. No Codex prompts were run.\n"
+        f"Run from Codex CLI with your payload:\n{command}"
     )
-    _print_findings(findings, False)
-    if findings:
-        for finding in findings:
-            print(f"Use 'ai-clean plan {finding.id}' to create a plan.")
-    return 0
+    print(message, file=sys.stderr)
+    return 1
 
 
 def _run_apply_command(args: argparse.Namespace) -> int:
@@ -727,23 +725,16 @@ def _run_apply_command(args: argparse.Namespace) -> int:
     except FileNotFoundError as exc:
         print(f"Failed to load plan or configuration: {exc}", file=sys.stderr)
         return 1
+    except ValueError as exc:
+        print(f"Plan failed validation: {exc}", file=sys.stderr)
+        return 1
     except Exception as exc:  # pragma: no cover - defensive
         print(f"Unexpected error while applying plan: {exc}", file=sys.stderr)
         return 1
 
-    print(f"Spec path: {spec_path}")
-    print(f"Apply success: {result.success}")
-    _print_tests_status(result)
-    if result.git_diff is not None:
-        print("Git diff stat:")
-        print(result.git_diff)
-    if result.stdout:
-        print("Executor stdout:")
-        print(result.stdout)
-    if result.stderr:
-        print("Executor stderr:", file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
-
+    _print_apply_summary(plan_id, spec_path, result)
+    if _manual_execution_required(result):
+        return 0
     return 0 if result.success else 1
 
 
@@ -1079,6 +1070,9 @@ def _prompt_plan_action(plan_id: str) -> str:
 
 def _print_apply_summary(plan_id: str, spec_path: str, result: ExecutionResult) -> None:
     print(f"Spec path: {spec_path}")
+    command = _resolve_slash_command(spec_path, result)
+    if command:
+        print(f"Run in Codex: {command}")
     print(f"Apply success: {result.success}")
     _print_tests_status(result)
     if result.git_diff:
@@ -1090,6 +1084,23 @@ def _print_apply_summary(plan_id: str, spec_path: str, result: ExecutionResult) 
     if result.stderr:
         print("Executor stderr:", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
+
+
+def _resolve_slash_command(spec_path: str, result: ExecutionResult) -> str | None:
+    metadata = result.metadata or {}
+    command = metadata.get("slash_command") if isinstance(metadata, dict) else None
+    if isinstance(command, str) and command.strip():
+        return command.strip()
+    if spec_path:
+        return f"codex /butler-exec {shlex.quote(spec_path)}"
+    return None
+
+
+def _manual_execution_required(result: ExecutionResult) -> bool:
+    metadata = result.metadata or {}
+    return bool(
+        isinstance(metadata, dict) and metadata.get("manual_execution_required")
+    )
 
 
 def _print_findings(findings: list[Finding], as_json: bool) -> int:

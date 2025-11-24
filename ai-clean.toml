@@ -6,10 +6,10 @@ type = "butler"
 default_batch_group = "default"
 
 [executor]
-# Codex shell wrapper applies specs using the Codex CLI binary
-type = "codex_shell"
-binary = "/opt/homebrew/bin/codex"
-apply_args = ["apply"]
+# Execution is manual: generate a ButlerSpec and run it via Codex slash command yourself
+type = "manual"
+binary = "/opt/homebrew/bin/codex"   # unused in manual mode
+apply_args = ["apply"]               # unused in manual mode
 
 [review]
 # Codex-powered reviewer summarizes risks after execution
@@ -60,7 +60,8 @@ max_groups = 5
 ignore_dirs = [".git", "__pycache__", ".venv"]
 
 [analyzers.advanced]
-# Advanced Codex analyzer settings (Phase 2.6)
+# Advanced analyzer is currently disabled until a Codex /cleanup-advanced slash
+# command exists; these settings are ignored for now.
 max_files = 3
 max_suggestions = 5
 prompt_template = "Suggest small, local cleanup changes only; no API redesigns.\nExisting findings:\n{findings}\n\nSnippets:\n{snippets}"

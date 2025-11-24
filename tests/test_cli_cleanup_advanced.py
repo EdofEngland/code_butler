@@ -1,28 +1,22 @@
 from __future__ import annotations
 
-import json
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
 
 from ai_clean import cli
-from ai_clean.models import Finding, FindingLocation
 
 
 class CleanupAdvancedCliTests(unittest.TestCase):
-    def test_text_output(self) -> None:
-        sample = _sample_finding()
-        with (
-            TemporaryDirectory() as tmp,
-            patch("ai_clean.cli.run_advanced_cleanup", return_value=[sample]),
-        ):
+    def test_command_is_disabled_and_does_not_invoke_runner(self) -> None:
+        with TemporaryDirectory() as tmp:
             findings_json = Path(tmp) / "findings.json"
-            findings_json.write_text("[]")
+            findings_json.write_text("[]", encoding="utf-8")
             stdout = StringIO()
-            with redirect_stdout(stdout):
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = cli.main(
                     [
                         "cleanup-advanced",
@@ -32,80 +26,13 @@ class CleanupAdvancedCliTests(unittest.TestCase):
                         str(findings_json),
                     ]
                 )
-        self.assertEqual(exit_code, 0)
-        self.assertIn(sample.id, stdout.getvalue())
-        self.assertIn(
-            f"Use 'ai-clean plan {sample.id}' to create a plan.", stdout.getvalue()
-        )
-        self.assertIn("analysis-only", stdout.getvalue())
 
-    def test_json_output(self) -> None:
-        sample = _sample_finding()
-        with (
-            TemporaryDirectory() as tmp,
-            patch("ai_clean.cli.run_advanced_cleanup", return_value=[sample]),
-        ):
-            findings_json = Path(tmp) / "findings.json"
-            findings_json.write_text("[]")
-            stdout = StringIO()
-            with redirect_stdout(stdout):
-                exit_code = cli.main(
-                    [
-                        "cleanup-advanced",
-                        "--root",
-                        tmp,
-                        "--findings-json",
-                        str(findings_json),
-                        "--json",
-                    ]
-                )
-
-        self.assertEqual(exit_code, 0)
-        payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload[0]["id"], sample.id)
-        # JSON mode should not include guidance text.
-        self.assertNotIn("ai-clean plan", stdout.getvalue())
-
-    def test_defaults_config_to_root(self) -> None:
-        with (
-            TemporaryDirectory() as tmp,
-            patch(
-                "ai_clean.cli.run_advanced_cleanup", return_value=[]
-            ) as mocked_runner,
-        ):
-            root = Path(tmp) / "repo"
-            root.mkdir()
-            (root / "ai-clean.toml").write_text("placeholder config", encoding="utf-8")
-            findings_json = Path(tmp) / "findings.json"
-            findings_json.write_text("[]")
-            stdout = StringIO()
-            with redirect_stdout(stdout):
-                exit_code = cli.main(
-                    [
-                        "cleanup-advanced",
-                        "--root",
-                        str(root),
-                        "--findings-json",
-                        str(findings_json),
-                    ]
-                )
-
-        self.assertEqual(exit_code, 0)
-        mocked_runner.assert_called_once()
-        call_args = mocked_runner.call_args[0]
-        expected_root = root.resolve()
-        self.assertEqual(call_args[0], expected_root)
-        self.assertEqual(call_args[1], expected_root / "ai-clean.toml")
-
-
-def _sample_finding() -> Finding:
-    return Finding(
-        id="adv-1234",
-        category="advanced_cleanup",
-        description="Extract constant",
-        locations=[FindingLocation(path=Path("module.py"), start_line=1, end_line=2)],
-        metadata={},
-    )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual("", stdout.getvalue().strip())
+        stderr_output = stderr.getvalue()
+        self.assertIn("Advanced cleanup is disabled", stderr_output)
+        self.assertIn("/cleanup-advanced", stderr_output)
+        self.assertIn(str(findings_json.resolve()), stderr_output)
 
 
 if __name__ == "__main__":  # pragma: no cover

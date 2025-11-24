@@ -13,7 +13,7 @@ traceable.
 - **Spec generation (Python tools)** — ButlerSpec backend serializes plans into `<plan>-spec.butler.yaml` with validation (single target file, <=25 actions). Use to keep a traceable spec for Codex. Won’t run code or apply changes.
 - **Execution (Codex/LLM required)** — `apply` invokes the Codex shell executor to run the spec and optional tests. Requires a working `codex` binary. Without Codex, specs are written but no code changes happen.
 - **Review (Codex/LLM required)** — `changes-review` sends plan/spec/diff metadata to a Codex reviewer for advisory risk checks. Needs the Codex prompt runner; otherwise it will fail.
-- **Advanced cleanup ideas (Codex/LLM required)** — `cleanup-advanced` builds prompts from prior findings to ask Codex for suggestions. Default runner is a stub that returns non-JSON, so no findings appear until you provide a real Codex prompt runner.
+- **Advanced cleanup ideas (via Codex slash command)** — `cleanup-advanced` is disabled in ai-clean; instead, run `codex /cleanup-advanced <PAYLOAD_PATH>` from Codex CLI. ai-clean will show the slash command and payload path but does not call Codex.
 
 Use ai-clean when you want reproducible, small-scope cleanups with explicit plan/spec metadata. Skip it for large architectural refactors, non-Python codebases, or environments without the Codex binary (execution/review/advanced flows will be no-ops or fail).
 
@@ -82,8 +82,8 @@ Summarizes risk/constraints using Codex reviewer (requires Codex).
   `long_function`, and optionally limits to `--path`. Prompts you to pick
   findings, creates plans under `.ai-clean/plans/`, and for each plan asks
   whether to save or apply immediately. Applying writes the ButlerSpec to
-  `.ai-clean/specs/`, runs the Codex shell executor and tests, and prints spec
-  path, success, tests status, and git diff.
+  `.ai-clean/specs/`, prints the Codex slash command for manual execution, and
+  records the spec path and not-executed status.
 - `annotate` — Docstring-focused workflow. Supports a positional path or
   `--path` filter. Modes: `missing` (default) or `all` (includes weak
   docstrings). Groups findings by module, creates plans for the selected
@@ -91,21 +91,25 @@ Summarizes risk/constraints using Codex reviewer (requires Codex).
 - `organize` — Runs the organize analyzer, shows candidate topic groups, lets
   you select indices, then creates plans (saved under `.ai-clean/plans/`) and
   asks to apply each now or save for later.
-- `cleanup-advanced` — Requires `--findings-json` from a prior `analyze --json`.
-  Builds a Codex prompt with the provided findings and selected file snippets.
-  The Codex runner must return a JSON array of suggestions
-  (`description/path/start_line/end_line/change_type`); the default stub runner
-  returns a non-JSON string, so no suggestions are emitted unless you replace
-  it. Output is advisory-only; apply via `plan`/`apply` later.
+- `cleanup-advanced` — ai-clean fails fast and prints the slash command to run
+  manually: `codex /cleanup-advanced <PAYLOAD_PATH>` (use an absolute path or run
+  from repo root). No Codex calls are made by ai-clean; run the slash command in
+  Codex CLI with your findings/snippets payload.
 - `plan` — Loads findings JSON (default `<root>/.ai-clean/findings.json` or
   `--findings-json`) and creates plan(s) for the specified `finding_id`. Plans
   are persisted under `.ai-clean/plans/` and summarized to stdout; nothing is
   applied here.
 - `apply` — Loads a saved plan by ID, converts it to ButlerSpec
-  `.ai-clean/specs/<plan>-spec.butler.yaml`, runs the Codex shell executor
-  (`executor.binary` + `apply_args`), executes the configured default tests, and
-  saves the ExecutionResult to `.ai-clean/results/<plan>.json`. Prints spec
-  path, success flag, tests status, git diff, stdout/stderr.
+  `.ai-clean/specs/<plan>-spec.butler.yaml`, and stops. Execution is manual:
+  ai-clean prints the absolute spec path and slash command
+  (`codex /butler-exec <SPEC_PATH>`) to run inside Codex CLI; repo-root-relative
+  paths are acceptable if you prefer them. ai-clean saves an ExecutionResult with
+  `success=False`, `tests_passed=None`, and `metadata.manual_execution_required=True`
+  to `.ai-clean/results/<plan>.json` to record that apply was not run.
+- `/butler-exec` (Codex CLI) — Run `codex /butler-exec <SPEC_PATH>` to execute a
+  ButlerSpec. Use an absolute path (or run from the repo root if using a relative
+  path). Codex CLI handles auth; the command emits only the unified diff and an
+  optional tests block if the spec defines a test command.
 - `changes-review` — Reads the plan, spec (if present), and execution result for
   a `plan_id`, attaches any available git diff, and sends it through the Codex
   review executor. Prints summary/risk/manual checks plus warnings when the spec,
@@ -144,17 +148,18 @@ Summarizes risk/constraints using Codex reviewer (requires Codex).
   (defaults 2–5), and `max_groups` (default 5). Metadata lists the topic and
   member file paths.
 
-## Advanced cleanup analyzer
+## Advanced cleanup analyzer (slash command)
 
-The advanced analyzer (used only by `cleanup-advanced`) selects up to
-`max_files` finding locations, attaches file snippets (±3 lines around each
-span, capped at 40 lines), and embeds an always-on guardrail sentence. It
-expects the Codex response to be a JSON array of suggestions with
-`description`, `path`, `start_line`, `end_line`, and `change_type` keys. It
-drops suggestions outside the selected files, disallowed change types, or over
-`max_suggestions`. Metadata on each finding includes the prompt hash, model
-name, and raw Codex payload for traceability. With the default stub runner no
-findings are produced because the response is not JSON.
+The advanced analyzer runs via the Codex slash command `/cleanup-advanced`:
+- Prepare a payload JSON that includes prior findings (`description`, `path`,
+  `start_line`, `end_line`, `change_type`), file snippets, and limits
+  (`max_files`, `max_suggestions`, `max_snippet_lines`).
+- Run `codex /cleanup-advanced <PAYLOAD_PATH>` from Codex CLI (absolute path
+  recommended; if relative, run from the repo root containing the files).
+- Output is JSON-only suggestions (`description`, `path`, `start_line`,
+  `end_line`, `change_type`, `model`, `prompt_hash`). If the payload is invalid
+  or exceeds limits, the command returns `Error: <reason>` with no suggestions.
+ai-clean does not invoke Codex; it only prints the slash command for you to run.
 
 ## Planning and apply guardrails
 
