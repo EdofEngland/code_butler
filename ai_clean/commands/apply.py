@@ -16,6 +16,7 @@ from ai_clean.git import ensure_on_refactor_branch, get_diff_stat
 from ai_clean.metadata import resolve_metadata_paths
 from ai_clean.models import CleanupPlan, ExecutionResult
 from ai_clean.plans import load_plan
+from ai_clean.results import save_execution_result
 from ai_clean.spec_backends import ButlerSpecBackend
 
 
@@ -29,7 +30,7 @@ def apply_plan(
     """Apply a single plan by ID and return its execution result and spec path."""
 
     config = load_config(config_path)
-    _, plans_dir, specs_dir, _ = resolve_metadata_paths(root, config)
+    _, plans_dir, specs_dir, results_dir = resolve_metadata_paths(root, config)
     ensure_on_refactor_branch(config.git.base_branch, config.git.refactor_branch)
 
     plan = _load_plan_by_id(plan_id, root=plans_dir.parent)
@@ -48,6 +49,8 @@ def apply_plan(
     diff_stat = get_diff_stat()
     if result.git_diff is None:
         result = result.model_copy(update={"git_diff": diff_stat})
+
+    save_execution_result(result, results_dir)
 
     return result, str(spec_path)
 

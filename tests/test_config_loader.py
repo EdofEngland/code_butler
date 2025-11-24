@@ -34,6 +34,10 @@ def _write_config(path: Path) -> None:
         [tests]
         default_command = "pytest -q"
 
+        [plan_limits]
+        max_files_per_plan = 1
+        max_changed_lines_per_plan = 200
+
         [analyzers.duplicate]
         window_size = 5
         min_occurrences = 2
@@ -101,7 +105,7 @@ class ConfigLoaderTests(unittest.TestCase):
             executor_handle = get_executor(config)
             self.assertEqual(executor_handle.results_dir, config.executor.results_dir)
             self.assertRaises(
-                NotImplementedError,
+                ValueError,
                 executor_handle.executor.apply_spec,
                 Path("spec.butler.yaml"),
             )
@@ -109,7 +113,7 @@ class ConfigLoaderTests(unittest.TestCase):
             review_handle = get_review_executor(config)
             self.assertEqual(review_handle.metadata_root, config.metadata_root)
             self.assertRaises(
-                NotImplementedError,
+                AttributeError,
                 review_handle.reviewer.review_change,
                 object(),
                 "diff",
@@ -123,6 +127,10 @@ class ConfigLoaderTests(unittest.TestCase):
                 duplicate_cfg.ignore_dirs,
                 (".git", "__pycache__", ".venv"),
             )
+
+            plan_limits = config.plan_limits
+            self.assertEqual(plan_limits.max_files_per_plan, 1)
+            self.assertEqual(plan_limits.max_changed_lines_per_plan, 200)
 
             structure_cfg = config.analyzers.structure
             self.assertEqual(structure_cfg.max_file_lines, 400)
@@ -173,6 +181,27 @@ class ConfigLoaderTests(unittest.TestCase):
                 ).strip()
             )
             with self.assertRaises(ValueError):
+                load_config(cfg_path)
+
+    def test_plan_limits_validation(self) -> None:
+        with TemporaryDirectory() as tmp:
+            cfg_path = Path(tmp) / "ai-clean.toml"
+            _write_config(cfg_path)
+            base_text = cfg_path.read_text()
+
+            cfg_path.write_text(
+                base_text.replace("max_files_per_plan = 1", "max_files_per_plan = 0")
+            )
+            with self.assertRaisesRegex(ValueError, "max_files_per_plan"):
+                load_config(cfg_path)
+
+            cfg_path.write_text(
+                base_text.replace(
+                    "max_changed_lines_per_plan = 200",
+                    "max_changed_lines_per_plan = -5",
+                )
+            )
+            with self.assertRaisesRegex(ValueError, "max_changed_lines_per_plan"):
                 load_config(cfg_path)
 
     def test_unsupported_type(self) -> None:

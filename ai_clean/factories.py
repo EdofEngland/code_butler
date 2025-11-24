@@ -68,6 +68,12 @@ class _CodexShellExecutor:
 
     _APPLY_TIMEOUT_SECONDS = 300.0
     _TEST_TIMEOUT_SECONDS = 600.0
+    _TEST_STATUS_RAN = "ran"
+    _TEST_STATUS_SKIPPED = "skipped"
+    _TEST_STATUS_NOT_CONFIGURED = "not_configured"
+    _TEST_STATUS_APPLY_FAILED = "apply_failed"
+    _TEST_STATUS_CMD_NOT_FOUND = "command_not_found"
+    _TEST_STATUS_TIMED_OUT = "timed_out"
 
     def __init__(self, config: ExecutorConfig, tests_config: TestsConfig) -> None:
         self._config = config
@@ -95,17 +101,24 @@ class _CodexShellExecutor:
         stdout = completed.stdout
         stderr = completed.stderr
         success = completed.returncode == 0
-        tests_passed: bool
-        tests_metadata: dict[str, object] | None = None
+        tests_passed: bool | None
+        tests_metadata: dict[str, object]
 
         if not success:
-            tests_passed = False
-            tests_metadata = {"skipped": "apply_failed"}
+            tests_passed = None
+            tests_metadata = {
+                "status": self._TEST_STATUS_APPLY_FAILED,
+                "reason": "apply_failed",
+                "apply_exit_code": completed.returncode,
+            }
         else:
             test_command = (self._tests_config.default_command or "").strip()
             if not test_command:
                 tests_passed = False
-                tests_metadata = {"skipped": "no_test_command"}
+                tests_metadata = {
+                    "status": self._TEST_STATUS_NOT_CONFIGURED,
+                    "reason": "no_test_command",
+                }
             else:
                 tests_passed, tests_metadata = self._run_tests(
                     test_command, resolved_path
@@ -114,8 +127,7 @@ class _CodexShellExecutor:
         self._assert_unchanged(resolved_path, initial_checksum)
 
         metadata: dict[str, object] = {"exit_code": completed.returncode}
-        if tests_metadata is not None:
-            metadata["tests"] = tests_metadata
+        metadata["tests"] = tests_metadata
 
         return ExecutionResult(
             spec_id=spec_id,
@@ -215,24 +227,24 @@ class _CodexShellExecutor:
             )
         except FileNotFoundError as exc:
             return False, {
-                "skipped": "test_command_not_found",
+                "status": self._TEST_STATUS_CMD_NOT_FOUND,
+                "command": command,
                 "error": str(exc),
             }
         except subprocess.TimeoutExpired as exc:
             return False, {
-                "skipped": "test_timeout",
+                "status": self._TEST_STATUS_TIMED_OUT,
+                "command": command,
                 "timeout_seconds": exc.timeout,
             }
 
-        return (
-            result.returncode == 0,
-            {
-                "command": command,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "exit_code": result.returncode,
-            },
-        )
+        return result.returncode == 0, {
+            "status": self._TEST_STATUS_RAN,
+            "command": command,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "exit_code": result.returncode,
+        }
 
 
 class _CodexReviewExecutor:

@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Callable, ClassVar
 
 from ai_clean.config import AiCleanConfig as ButlerConfig
 from ai_clean.models import CleanupPlan, Finding
+from ai_clean.planners.concerns import (
+    split_mixed_concerns,
+    validate_plan_concerns,
+)
+from ai_clean.planners.limits import (
+    split_plans_to_limits,
+    validate_plan_limits,
+)
+from ai_clean.planners.scope_guard import validate_scope
 
 from .advanced import plan_advanced_cleanup
 from .docstrings import plan_docstring_fix
@@ -16,6 +26,8 @@ from .organize import plan_organize_candidate
 from .structure import plan_large_file, plan_long_function
 
 PlannerCallable = Callable[[Finding, ButlerConfig], list[CleanupPlan]]
+
+LOGGER = logging.getLogger(__name__)
 
 _PLAN_ID_PATTERN = re.compile(r"^[a-z0-9-]+$")
 _DASH_RE = re.compile(r"-+")
@@ -79,6 +91,13 @@ _CATEGORY_DISPATCH: dict[str, PlannerCallable] = {
     "organize_candidate": plan_organize_candidate,
     "weak_docstring": plan_docstring_fix,
 }
+_SPLITTABLE_CATEGORIES = {
+    "advanced_cleanup",
+    "large_file",
+    "long_function",
+    "organize_candidate",
+}
+_FILE_LIMIT_EXEMPT_CATEGORIES = {"duplicate_block"}
 
 
 def plan_from_finding(finding: Finding, config: ButlerConfig) -> list[CleanupPlan]:
@@ -87,4 +106,19 @@ def plan_from_finding(finding: Finding, config: ButlerConfig) -> list[CleanupPla
     planner = _CATEGORY_DISPATCH.get(finding.category)
     if planner is None:
         raise NotImplementedError(f"Unsupported finding category: {finding.category}")
-    return planner(finding, config)
+    plans = planner(finding, config)
+    processed = (
+        split_plans_to_limits(plans, config.plan_limits, logger=LOGGER)
+        if finding.category in _SPLITTABLE_CATEGORIES
+        else plans
+    )
+    processed = split_mixed_concerns(processed, logger=LOGGER)
+    validate_plan_concerns(processed)
+    validate_scope(processed, logger=LOGGER)
+    for plan in processed:
+        validate_plan_limits(
+            plan,
+            config.plan_limits,
+            enforce_file_count=finding.category not in _FILE_LIMIT_EXEMPT_CATEGORIES,
+        )
+    return processed

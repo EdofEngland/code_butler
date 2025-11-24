@@ -86,6 +86,9 @@ def plan_docstring_fix(finding: Finding, config: ButlerConfig) -> list[CleanupPl
         {
             "plan_kind": "docstring",
             "target_file": path_str,
+            "start_line": start_line,
+            "end_line": end_line,
+            "line_span": end_line - start_line + 1,
             "qualified_name": qualified_name,
             "symbol_name": symbol_name,
             "symbol_type": symbol_type,

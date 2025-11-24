@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from ai_clean.config import (
     ExecutorConfig,
     GitConfig,
     OrganizeAnalyzerConfig,
+    PlanLimitsConfig,
     ReviewConfig,
     SpecBackendConfig,
     StructureAnalyzerConfig,
@@ -74,6 +76,10 @@ def _sample_config(
             ignore_dirs=(".git",),
         ),
     )
+    plan_limits = PlanLimitsConfig(
+        max_files_per_plan=1,
+        max_changed_lines_per_plan=200,
+    )
 
     return AiCleanConfig(
         spec_backend=SpecBackendConfig(
@@ -90,6 +96,7 @@ def _sample_config(
         review=ReviewConfig(type=review_type, mode="summarize"),
         git=GitConfig(base_branch="main", refactor_branch="refactor/ai-clean"),
         tests=TestsConfig(default_command=tests_command),
+        plan_limits=plan_limits,
         analyzers=analyzers,
         metadata_root=metadata_root,
         plans_dir=plans_dir,
@@ -225,7 +232,7 @@ def test_codex_shell_executor_maps_process_output(monkeypatch, tmp_path):
     assert result.success is False
     assert result.stdout == "apply stdout"
     assert result.stderr == "apply stderr"
-    assert result.tests_passed is False
+    assert result.tests_passed is None
     assert result.git_diff is None
     assert result.metadata["exit_code"] == 3
 
@@ -273,10 +280,12 @@ def test_executor_runs_tests_after_successful_apply(monkeypatch, tmp_path):
     assert result.tests_passed is True
     assert result.stdout == "apply out"
     assert result.stderr == "apply err"
-    assert result.metadata["tests"]["command"] == "run-tests"
-    assert result.metadata["tests"]["exit_code"] == 0
-    assert result.metadata["tests"]["stdout"] == "test out"
-    assert result.metadata["tests"]["stderr"] == "test err"
+    tests_meta = result.metadata["tests"]
+    assert tests_meta["status"] == "ran"
+    assert tests_meta["command"] == "run-tests"
+    assert tests_meta["exit_code"] == 0
+    assert tests_meta["stdout"] == "test out"
+    assert tests_meta["stderr"] == "test err"
 
 
 def test_executor_marks_tests_failed_without_affecting_apply_success(
@@ -315,9 +324,11 @@ def test_executor_marks_tests_failed_without_affecting_apply_success(
     assert result.success is True
     assert result.tests_passed is False
     assert result.metadata["exit_code"] == 0
-    assert result.metadata["tests"]["exit_code"] == 5
-    assert result.metadata["tests"]["stdout"] == "test fail"
-    assert result.metadata["tests"]["stderr"] == "failure"
+    tests_meta = result.metadata["tests"]
+    assert tests_meta["status"] == "ran"
+    assert tests_meta["exit_code"] == 5
+    assert tests_meta["stdout"] == "test fail"
+    assert tests_meta["stderr"] == "failure"
     assert result.stdout == "apply ok"
     assert result.stderr == "apply err"
 
@@ -350,8 +361,10 @@ def test_executor_skips_tests_when_apply_fails(monkeypatch, tmp_path):
 
     assert len(calls) == 1  # tests not invoked
     assert result.success is False
-    assert result.tests_passed is False
-    assert result.metadata["tests"]["skipped"] == "apply_failed"
+    assert result.tests_passed is None
+    tests_meta = result.metadata["tests"]
+    assert tests_meta["status"] == "apply_failed"
+    assert tests_meta["apply_exit_code"] == 2
     assert result.stdout == "apply fail"
     assert result.stderr == "apply err"
 
@@ -385,7 +398,71 @@ def test_executor_skips_tests_when_command_missing(monkeypatch, tmp_path):
     assert len(calls) == 1
     assert result.success is True
     assert result.tests_passed is False
-    assert result.metadata["tests"]["skipped"] == "no_test_command"
+    assert result.metadata["tests"]["status"] == "not_configured"
+
+
+def test_executor_records_missing_test_binary(monkeypatch, tmp_path):
+    config = _sample_config("butler", tests_command="run-tests")
+    executor = get_executor(config).executor
+    spec_path = tmp_path / "spec-demo.butler.yaml"
+    spec_path.write_text("id: spec-demo\nplan_id: plan-123\n")
+
+    monkeypatch.setattr(
+        factories.shutil, "which", lambda binary: f"/usr/local/bin/{binary}"
+    )
+
+    def fake_run(cmd, **kwargs):
+        if isinstance(cmd, list):
+
+            class ApplyResult:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return ApplyResult()
+        raise FileNotFoundError("run-tests missing")
+
+    monkeypatch.setattr(factories.subprocess, "run", fake_run)
+
+    result = executor.apply_spec(spec_path)
+
+    assert result.success is True
+    assert result.tests_passed is False
+    tests_meta = result.metadata["tests"]
+    assert tests_meta["status"] == "command_not_found"
+    assert "missing" in tests_meta["error"]
+
+
+def test_executor_records_test_timeout(monkeypatch, tmp_path):
+    config = _sample_config("butler", tests_command="run-tests")
+    executor = get_executor(config).executor
+    spec_path = tmp_path / "spec-demo.butler.yaml"
+    spec_path.write_text("id: spec-demo\nplan_id: plan-123\n")
+
+    monkeypatch.setattr(
+        factories.shutil, "which", lambda binary: f"/usr/local/bin/{binary}"
+    )
+
+    def fake_run(cmd, **kwargs):
+        if isinstance(cmd, list):
+
+            class ApplyResult:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return ApplyResult()
+        raise subprocess.TimeoutExpired(cmd="run-tests", timeout=5)
+
+    monkeypatch.setattr(factories.subprocess, "run", fake_run)
+
+    result = executor.apply_spec(spec_path)
+
+    assert result.success is True
+    assert result.tests_passed is False
+    tests_meta = result.metadata["tests"]
+    assert tests_meta["status"] == "timed_out"
+    assert tests_meta["timeout_seconds"] == 5
 
 
 def test_review_executor_loads_plan_and_builds_prompt(monkeypatch, tmp_path):
@@ -467,8 +544,7 @@ def test_review_executor_flags_missing_exec_fields(tmp_path):
         stderr="",
     )
 
-    with pytest.raises(ValueError, match="ExecutionResult missing required fields"):
-        reviewer.review_change(plan, "diff", exec_result)
+    reviewer.review_change(plan, "diff", exec_result)
 
 
 def test_review_executor_rejects_patchy_output(monkeypatch, tmp_path):

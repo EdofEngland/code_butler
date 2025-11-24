@@ -13,6 +13,7 @@ from ai_clean.config import (
     ExecutorConfig,
     GitConfig,
     OrganizeAnalyzerConfig,
+    PlanLimitsConfig,
     ReviewConfig,
     SpecBackendConfig,
     StructureAnalyzerConfig,
@@ -56,6 +57,10 @@ def _make_config(default_command: str = "pytest -q") -> AiCleanConfig:
             ignore_dirs=(".git",),
         ),
     )
+    plan_limits = PlanLimitsConfig(
+        max_files_per_plan=1,
+        max_changed_lines_per_plan=200,
+    )
     return AiCleanConfig(
         spec_backend=SpecBackendConfig(
             type="butler",
@@ -71,6 +76,7 @@ def _make_config(default_command: str = "pytest -q") -> AiCleanConfig:
         review=ReviewConfig(type="codex_review", mode="summaries"),
         git=GitConfig(base_branch="main", refactor_branch="refactor/ai-clean"),
         tests=TestsConfig(default_command=default_command),
+        plan_limits=plan_limits,
         analyzers=analyzers,
         metadata_root=Path(".ai-clean"),
         plans_dir=Path(".ai-clean/plans"),

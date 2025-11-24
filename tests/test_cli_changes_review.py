@@ -50,6 +50,15 @@ class ChangesReviewCliTests(unittest.TestCase):
                 stdout="ok",
                 stderr="",
                 git_diff="diff --stat",
+                metadata={
+                    "tests": {
+                        "status": "ran",
+                        "command": "pytest -q",
+                        "exit_code": 0,
+                        "stdout": "ok",
+                        "stderr": "",
+                    }
+                },
             )
             result_path = metadata_root / "results" / f"{plan.id}.json"
             result_path.parent.mkdir(parents=True, exist_ok=True)

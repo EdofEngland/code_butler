@@ -659,6 +659,13 @@ def _run_changes_review_command(args: argparse.Namespace) -> int:
         warnings.append(exec_warning)
     if not diff_text.strip():
         warnings.append("Git diff not available; review based on plan/spec only.")
+    if exec_result:
+        tests_meta = (
+            (exec_result.metadata or {}).get("tests") if exec_result.metadata else None
+        )
+        tests_note = _tests_warning(tests_meta, exec_result.tests_passed)
+        if tests_note:
+            warnings.append(tests_note)
 
     review_diff = _compose_review_diff(diff_text, spec_text)
     review_exec_result = _prepare_execution_result_for_review(
@@ -730,7 +737,7 @@ def _run_apply_command(args: argparse.Namespace) -> int:
 
     print(f"Spec path: {spec_path}")
     print(f"Apply success: {result.success}")
-    print(f"Tests passed: {result.tests_passed}")
+    _print_tests_status(result)
     if result.git_diff is not None:
         print("Git diff stat:")
         print(result.git_diff)
@@ -1077,7 +1084,7 @@ def _prompt_plan_action(plan_id: str) -> str:
 def _print_apply_summary(plan_id: str, spec_path: str, result: ExecutionResult) -> None:
     print(f"Spec path: {spec_path}")
     print(f"Apply success: {result.success}")
-    print(f"Tests passed: {result.tests_passed}")
+    _print_tests_status(result)
     if result.git_diff:
         print("Git diff stat:")
         print(result.git_diff)
@@ -1223,13 +1230,77 @@ def _print_review_summary(
             print(f"- {check}")
     else:
         print("None noted.")
-    print()
-    print("Constraint Validation Notes:")
+
     if constraint_notes:
+        print()
+        print("Constraint Validation Notes:")
         for note in constraint_notes:
             print(f"- {note}")
-    else:
-        print("No explicit constraint notes.")
+
+
+def _print_tests_status(result: ExecutionResult) -> None:
+    tests_meta = (result.metadata or {}).get("tests") if result.metadata else None
+    if not tests_meta:
+        print(f"Tests status: unknown (tests_passed={result.tests_passed})")
+        return
+
+    status = str(tests_meta.get("status", "unknown"))
+    parts = [f"Tests status: {status}"]
+    command = tests_meta.get("command")
+    if command:
+        parts.append(f"command={command}")
+    reason = tests_meta.get("reason") or tests_meta.get("error")
+    if reason:
+        parts.append(f"reason={reason}")
+    exit_code = tests_meta.get("exit_code")
+    if exit_code is not None:
+        parts.append(f"exit_code={exit_code}")
+    timeout = tests_meta.get("timeout_seconds")
+    if timeout is not None:
+        parts.append(f"timeout_seconds={timeout}")
+    print("; ".join(parts))
+    print(f"Tests passed: {result.tests_passed}")
+
+    if status == "ran":
+        stdout = str(tests_meta.get("stdout") or "")
+        stderr = str(tests_meta.get("stderr") or "")
+        if stdout.strip():
+            print("Tests stdout:")
+            print(_truncate_text(stdout))
+        if stderr.strip():
+            print("Tests stderr:", file=sys.stderr)
+            print(_truncate_text(stderr), file=sys.stderr)
+
+
+def _tests_warning(tests_meta: object, tests_passed: bool | None) -> str | None:
+    if not isinstance(tests_meta, dict):
+        return "Tests status unknown; no metadata recorded."
+
+    status = str(tests_meta.get("status", "unknown"))
+    command = tests_meta.get("command")
+    exit_code = tests_meta.get("exit_code")
+    timeout = tests_meta.get("timeout_seconds")
+    if status == "not_configured":
+        return "Tests not configured; configure tests.default_command."
+    if status == "apply_failed":
+        return "Tests skipped because apply failed."
+    if status == "command_not_found":
+        return f"Tests command not found: {command or '<unknown>'}"
+    if status == "timed_out":
+        return f"Tests timed out after {timeout or '?'} seconds."
+    if status == "skipped":
+        return "Tests skipped."
+    if status == "ran" and (
+        tests_passed is False or (exit_code is not None and exit_code != 0)
+    ):
+        return f"Tests failed (exit_code={exit_code})."
+    return None
+
+
+def _truncate_text(text: str, limit: int = 400) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
 
 
 def _display_path(path: Path, root: Path) -> str:

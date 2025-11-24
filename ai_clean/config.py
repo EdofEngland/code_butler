@@ -47,6 +47,12 @@ class TestsConfig:
 
 
 @dataclass(frozen=True)
+class PlanLimitsConfig:
+    max_files_per_plan: int
+    max_changed_lines_per_plan: int
+
+
+@dataclass(frozen=True)
 class DuplicateAnalyzerConfig:
     window_size: int
     min_occurrences: int
@@ -103,6 +109,7 @@ class AiCleanConfig:
     review: ReviewConfig
     git: GitConfig
     tests: TestsConfig
+    plan_limits: PlanLimitsConfig
     analyzers: AnalyzersConfig
     metadata_root: Path
     plans_dir: Path
@@ -130,6 +137,8 @@ _DEFAULT_ADV_PROMPT = (
 )
 _DEFAULT_ADV_MODEL = "gpt-4o-mini"
 _DEFAULT_ADV_TEMPERATURE = 0.2
+_DEFAULT_PLAN_MAX_FILES = 1
+_DEFAULT_PLAN_MAX_CHANGED_LINES = 200
 
 
 def _load_toml_text(text: str) -> dict[str, Any]:
@@ -195,6 +204,7 @@ def load_config(path: Path | None = None) -> AiCleanConfig:
     review_section = raw.get("review")
     git_section = raw.get("git")
     tests_section = raw.get("tests")
+    plan_limits_section = raw.get("plan_limits", {})
 
     missing = [
         name
@@ -256,6 +266,29 @@ def load_config(path: Path | None = None) -> AiCleanConfig:
         refactor_branch=git_section.get("refactor_branch", ""),
     )
     tests = TestsConfig(default_command=tests_section.get("default_command", ""))
+
+    max_files_per_plan = _coerce_int(
+        plan_limits_section.get("max_files_per_plan"),
+        default=_DEFAULT_PLAN_MAX_FILES,
+        field_name="max_files_per_plan",
+        context="Plan limits",
+    )
+    if max_files_per_plan < 1:
+        raise ValueError("Plan limits max_files_per_plan must be at least 1")
+
+    max_changed_lines_per_plan = _coerce_int(
+        plan_limits_section.get("max_changed_lines_per_plan"),
+        default=_DEFAULT_PLAN_MAX_CHANGED_LINES,
+        field_name="max_changed_lines_per_plan",
+        context="Plan limits",
+    )
+    if max_changed_lines_per_plan < 1:
+        raise ValueError("Plan limits max_changed_lines_per_plan must be at least 1")
+
+    plan_limits = PlanLimitsConfig(
+        max_files_per_plan=max_files_per_plan,
+        max_changed_lines_per_plan=max_changed_lines_per_plan,
+    )
 
     duplicate_section = _extract_section(raw, "analyzers", "duplicate")
 
@@ -464,6 +497,7 @@ def load_config(path: Path | None = None) -> AiCleanConfig:
         review=review,
         git=git,
         tests=tests,
+        plan_limits=plan_limits,
         analyzers=analyzers,
         metadata_root=metadata_root,
         plans_dir=plans_dir,
@@ -608,5 +642,6 @@ __all__ = [
     "ReviewConfig",
     "SpecBackendConfig",
     "TestsConfig",
+    "PlanLimitsConfig",
     "load_config",
 ]
