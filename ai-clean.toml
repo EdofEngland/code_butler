@@ -34,15 +34,15 @@ max_changed_lines_per_plan = 200
 
 [analyzers.duplicate]
 # Duplicate analyzer settings used by `/analyze`
-window_size = 5          # How many consecutive lines form a window
-min_occurrences = 2      # Minimum occurrences required before reporting
-ignore_dirs = [".git", "__pycache__", ".venv"]
+window_size = 10         # How many consecutive lines form a window
+min_occurrences = 5      # Minimum occurrences required before reporting
+ignore_dirs = [".git", "__pycache__", ".venv", "venv", "build"]
 
 [analyzers.structure]
 # Structure analyzer thresholds for `/analyze`
 max_file_lines = 400       # Files above this many lines trigger findings
 max_function_lines = 60    # Functions longer than this trigger findings
-ignore_dirs = [".git", "__pycache__", ".venv"]
+ignore_dirs = [".git", "__pycache__", ".venv", "venv", "build"]
 
 [analyzers.docstring]
 # Docstring analyzer controls for `/analyze`
@@ -50,14 +50,14 @@ min_docstring_length = 32     # Minimum characters before a docstring counts as 
 min_symbol_lines = 5          # Symbols shorter than this are ignored when important_symbols_only = true
 weak_markers = ["TODO", "fixme", "tbd"]
 important_symbols_only = true
-ignore_dirs = [".git", "__pycache__", ".venv"]
+ignore_dirs = [".git", "__pycache__", ".venv", "venv", "build"]
 
 [analyzers.organize]
 # Organize analyzer thresholds
 min_group_size = 2
 max_group_size = 5
 max_groups = 5
-ignore_dirs = [".git", "__pycache__", ".venv"]
+ignore_dirs = [".git", "__pycache__", ".venv", "venv", "build"]
 
 [analyzers.advanced]
 # Advanced Codex analyzer settings (Phase 2.6)
@@ -66,11 +66,4 @@ max_suggestions = 5
 prompt_template = "Suggest small, local cleanup changes only; no API redesigns.\nExisting findings:\n{findings}\n\nSnippets:\n{snippets}"
 codex_model = "gpt-4o-mini"
 temperature = 0.2
-ignore_dirs = [".git", "__pycache__", ".venv"]
-[analyzers.docstring]
-# Docstring analyzer controls for `/analyze`
-min_docstring_length = 32     # Minimum characters before a docstring counts as substantive
-min_symbol_lines = 5          # Symbols shorter than this are ignored when important_symbols_only = true
-weak_markers = ["TODO", "fixme", "tbd"]
-important_symbols_only = true
-ignore_dirs = [".git", "__pycache__", ".venv"]
+ignore_dirs = [".git", "__pycache__", ".venv", "venv", "build"]
