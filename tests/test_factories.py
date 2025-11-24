@@ -139,6 +139,15 @@ def test_get_executor_valid_and_unknown_types():
         get_executor(bad_config)
 
 
+def test_get_executor_rejects_manual_for_apply_flow():
+    bad_config = _sample_config("butler", executor_type="manual")
+
+    with pytest.raises(
+        ValueError, match="executor.type=manual does not support apply/review/ingest"
+    ):
+        get_executor(bad_config)
+
+
 def test_get_review_executor_valid_and_unknown_types(tmp_path, monkeypatch):
     metadata_root = tmp_path / ".ai-clean"
     config = _sample_config("butler", metadata_root=metadata_root)

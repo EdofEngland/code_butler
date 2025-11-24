@@ -13,6 +13,7 @@ from ai_clean.analyzers import analyze_repo
 from ai_clean.analyzers.docstrings import find_docstring_gaps
 from ai_clean.analyzers.organize import propose_organize_groups
 from ai_clean.commands.apply import apply_plan
+from ai_clean.commands.ingest import IngestError, ingest_codex_artifact
 from ai_clean.commands.plan import run_plan_for_finding
 from ai_clean.config import load_config
 from ai_clean.factories import get_review_executor
@@ -35,6 +36,7 @@ _COMMAND_SPECS: tuple[tuple[str, str], ...] = (
     ),
     ("plan", "Author a new ButlerSpec plan for a specific finding"),
     ("apply", "Apply a ButlerSpec plan using Codex"),
+    ("ingest", "Ingest Codex artifact output into ai-clean results"),
     ("changes-review", "Review executed plans and summarize risks"),
 )
 
@@ -225,6 +227,45 @@ def _build_parser() -> argparse.ArgumentParser:
                 help="Optional ai-clean configuration file to load",
             )
             subparser.set_defaults(handler=_run_apply_command)
+            continue
+        if command_name == "ingest":
+            subparser.add_argument(
+                "--plan-id",
+                required=True,
+                help="Plan ID whose execution result should be updated",
+            )
+            subparser.add_argument(
+                "--artifact",
+                required=False,
+                help=(
+                    "Path to Codex artifact JSON. Defaults to "
+                    ".ai-clean/results/<plan>.codex.json under --root."
+                ),
+            )
+            subparser.add_argument(
+                "--root",
+                default=".",
+                help="Path to the repository root (defaults to current directory)",
+            )
+            subparser.add_argument(
+                "--config",
+                default=None,
+                help="Optional ai-clean configuration file to load",
+            )
+            subparser.add_argument(
+                "--update-findings",
+                action="store_true",
+                help="When set, ingest suggestions array into findings JSON",
+            )
+            subparser.add_argument(
+                "--findings-json",
+                default=None,
+                help=(
+                    "Optional findings JSON path "
+                    "(defaults to .ai-clean/findings.json)"
+                ),
+            )
+            subparser.set_defaults(handler=_run_ingest_command)
             continue
         subparser.set_defaults(handler=_make_handler(command_name))
 
@@ -735,6 +776,62 @@ def _run_apply_command(args: argparse.Namespace) -> int:
     _print_apply_summary(plan_id, spec_path, result)
     if _manual_execution_required(result):
         return 0
+    return 0 if result.success else 1
+
+
+def _run_ingest_command(args: argparse.Namespace) -> int:
+    root = Path(args.root).expanduser().resolve()
+    config_path = _resolve_config_path(root, args.config)
+    plan_id = args.plan_id
+
+    try:
+        config = load_config(config_path)
+    except Exception as exc:
+        print(f"Failed to load configuration: {exc}", file=sys.stderr)
+        return 1
+
+    _, _, _, results_dir = resolve_metadata_paths(root, config)
+    if args.artifact:
+        artifact_path = Path(args.artifact).expanduser()
+        if not artifact_path.is_absolute():
+            artifact_path = (root / artifact_path).resolve()
+        else:
+            artifact_path = artifact_path.resolve()
+    else:
+        artifact_path = (results_dir / f"{plan_id}.codex.json").resolve()
+
+    if args.findings_json:
+        findings_path = Path(args.findings_json).expanduser()
+        if not findings_path.is_absolute():
+            findings_path = (root / findings_path).resolve()
+        else:
+            findings_path = findings_path.resolve()
+    else:
+        findings_path = None
+
+    try:
+        result, summary = ingest_codex_artifact(
+            plan_id=plan_id,
+            artifact_path=artifact_path,
+            results_dir=results_dir,
+            root=root,
+            update_findings=args.update_findings,
+            findings_path=findings_path,
+            max_suggestions=config.analyzers.advanced.max_suggestions,
+            max_suggestion_files=config.analyzers.advanced.max_files,
+        )
+    except (IngestError, FileNotFoundError) as exc:
+        print(f"Ingest failed: {exc}", file=sys.stderr)
+        return 1
+
+    _print_ingest_summary(
+        plan_id,
+        artifact_path,
+        result,
+        summary.tests_status,
+        (summary.diff_added, summary.diff_removed),
+        summary.suggestions_ingested,
+    )
     return 0 if result.success else 1
 
 
@@ -1302,6 +1399,27 @@ def _tests_warning(tests_meta: object, tests_passed: bool | None) -> str | None:
     ):
         return f"Tests failed (exit_code={exit_code})."
     return None
+
+
+def _print_ingest_summary(
+    plan_id: str,
+    artifact_path: Path,
+    result: ExecutionResult,
+    tests_status: str,
+    diff_stats: tuple[int, int],
+    suggestions_ingested: int,
+) -> None:
+    added, removed = diff_stats
+    print(f"Ingested artifact: {artifact_path}")
+    print(f"Plan: {plan_id}")
+    print(f"Apply success: {result.success}")
+    print(f"Tests status: {tests_status}; tests_passed={result.tests_passed}")
+    if added or removed:
+        print(f"Diff stat: +{added} / -{removed}")
+    else:
+        print("Diff stat: none")
+    if suggestions_ingested:
+        print(f"Ingested suggestions: {suggestions_ingested}")
 
 
 def _truncate_text(text: str, limit: int = 400) -> str:

@@ -430,10 +430,15 @@ def get_spec_backend(config: AiCleanConfig) -> SpecBackendHandle:
 
 def get_executor(config: AiCleanConfig) -> ExecutorHandle:
     exec_type = (config.executor.type or "").strip().lower()
+    if exec_type == "manual":
+        raise ValueError(
+            "executor.type=manual does not support apply/review/ingest; "
+            "configure codex_shell to run specs."
+        )
     if exec_type != "codex_shell":
         raise ValueError(
             f"Unsupported executor type: {exec_type or '<empty>'}. "
-            "Supported executors: codex_shell"
+            "Supported executors: codex_shell, manual"
         )
     executor = _CodexShellExecutor(config.executor, config.tests)
     return ExecutorHandle(executor=executor, results_dir=config.executor.results_dir)

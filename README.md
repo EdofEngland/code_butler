@@ -106,6 +106,12 @@ Summarizes risk/constraints using Codex reviewer (requires Codex).
   paths are acceptable if you prefer them. ai-clean saves an ExecutionResult with
   `success=False`, `tests_passed=None`, and `metadata.manual_execution_required=True`
   to `.ai-clean/results/<plan>.json` to record that apply was not run.
+- `ingest` — Reads a Codex artifact (default
+  `.ai-clean/results/<plan>.codex.json`) via `--artifact`, validates it
+  (unified diff + tests block), updates `.ai-clean/results/<plan>.json` to clear
+  `manual_execution_required`, and prints a diff/tests summary. Pass
+  `--update-findings` to ingest `cleanup-advanced` suggestions into findings
+  JSON.
 - `/butler-exec` (Codex CLI) — Run `codex /butler-exec <SPEC_PATH>` to execute a
   ButlerSpec. Use an absolute path (or run from the repo root if using a relative
   path). Codex CLI handles auth; the command emits only the unified diff and an

@@ -12,3 +12,11 @@ Slash command:
 ExecutionResult storage:
 - Stored under `.ai-clean/results/<plan>.json` with `spec_id`, `plan_id`, `success=False`, `tests_passed=None`, `stdout` containing the instructions, `metadata.manual_execution_required=True`, `metadata.slash_command`, and `metadata.tests.status="not_run"`. No diff/tests output is present until the slash command runs.
 - If we later ingest user-provided output, expect `diff` (text), `stdout`, `stderr`, and a `tests` block containing `status`, `command`, `exit_code`, `stdout`, and `stderr`. When the user does not run Codex, leave these fields empty and keep `manual_execution_required` true.
+
+## Ingesting Codex artifacts
+
+- Command: `ai-clean ingest --plan-id <id> --artifact <path> [--root <repo>] [--config <file>] [--update-findings]`.
+- Artifact: JSON object with `diff` (unified, single file), `stdout`, `stderr`, and `tests` (`status`, `command`, `exit_code`, `stdout`, `stderr`; optional `reason`). Optional `plan_id/spec_path` for cross-checking and `suggestions` array from `/cleanup-advanced`.
+- Validation: rejects missing/extra fields, non-unified or empty diff (unless `tests.status=apply_failed`), unsupported test status, plan_id mismatch, or multi-file diffs. Allowed statuses: `ran`, `failed`, `not_run`, `timed_out`, `command_not_found`, `apply_failed`.
+- Effects: updates `.ai-clean/results/<plan>.json`, sets `metadata.manual_execution_required=False`, writes `git_diff/stdout/stderr/metadata.tests`, derives `success/tests_passed`, and prints a summary (diff stat + tests).
+- Suggestions: when `--update-findings` is set and the artifact includes a `suggestions` array, valid entries are converted to `Finding` objects (category `advanced_cleanup`) and appended to findings JSON (default `.ai-clean/findings.json`). Invalid suggestions abort ingest.
