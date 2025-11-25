@@ -392,7 +392,7 @@ def _run_clean_command(args: argparse.Namespace) -> int:
                 )
                 continue
             try:
-                result, spec_path = apply_plan(plans_dir.parent, config_path, plan.id)
+                _, spec_path = apply_plan(plans_dir.parent, config_path, plan.id)
             except FileNotFoundError as exc:
                 print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
                 overall_failure = True
@@ -408,9 +408,7 @@ def _run_clean_command(args: argparse.Namespace) -> int:
                 overall_failure = True
                 continue
 
-    _print_apply_summary(plan.id, spec_path, result)
-    if not result.success and not _manual_execution_required(result):
-        overall_failure = True
+            _print_manual_apply(plan.id, spec_path)
 
     return 1 if overall_failure else 0
 
@@ -518,7 +516,7 @@ def _run_annotate_command(args: argparse.Namespace) -> int:
     applied = 0
     for plan, _ in created_plans:
         try:
-            result, spec_path = apply_plan(plans_dir.parent, config_path, plan.id)
+            _, spec_path = apply_plan(plans_dir.parent, config_path, plan.id)
         except FileNotFoundError as exc:
             print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
             overall_failure = True
@@ -532,10 +530,8 @@ def _run_annotate_command(args: argparse.Namespace) -> int:
             overall_failure = True
             continue
 
-    _print_apply_summary(plan.id, spec_path, result)
-    applied += 1
-    if not result.success and not _manual_execution_required(result):
-        overall_failure = True
+        _print_manual_apply(plan.id, spec_path)
+        applied += 1
 
     print(f"Planned {len(created_plans)} docstring(s); applied {applied} plan(s).")
     return 1 if overall_failure else 0
@@ -631,7 +627,7 @@ def _run_organize_command(args: argparse.Namespace) -> int:
                 created_plans.append((plan, plan_path))
                 continue
             try:
-                result, spec_path = apply_plan(plans_dir.parent, config_path, plan.id)
+                _, spec_path = apply_plan(plans_dir.parent, config_path, plan.id)
             except FileNotFoundError as exc:
                 print(f"Failed to apply plan {plan.id}: {exc}", file=sys.stderr)
                 overall_failure = True
@@ -650,11 +646,9 @@ def _run_organize_command(args: argparse.Namespace) -> int:
                 created_plans.append((plan, plan_path))
                 continue
 
-            _print_apply_summary(plan.id, spec_path, result)
+            _print_manual_apply(plan.id, spec_path)
             applied += 1
             created_plans.append((plan, plan_path))
-            if not result.success and not _manual_execution_required(result):
-                overall_failure = True
 
     if created_plans:
         print(
@@ -762,7 +756,7 @@ def _run_apply_command(args: argparse.Namespace) -> int:
     plan_id = args.plan_id
 
     try:
-        result, spec_path = apply_plan(root, config_path, plan_id)
+        spec_id, spec_path = apply_plan(root, config_path, plan_id)
     except FileNotFoundError as exc:
         print(f"Failed to load plan or configuration: {exc}", file=sys.stderr)
         return 1
@@ -773,10 +767,8 @@ def _run_apply_command(args: argparse.Namespace) -> int:
         print(f"Unexpected error while applying plan: {exc}", file=sys.stderr)
         return 1
 
-    _print_apply_summary(plan_id, spec_path, result)
-    if _manual_execution_required(result):
-        return 0
-    return 0 if result.success else 1
+    _print_manual_apply(plan_id, spec_path)
+    return 0
 
 
 def _run_ingest_command(args: argparse.Namespace) -> int:
@@ -1165,26 +1157,10 @@ def _prompt_plan_action(plan_id: str) -> str:
         print("Invalid choice. Enter S, A, or K.")
 
 
-def _print_apply_summary(plan_id: str, spec_path: str, result: ExecutionResult) -> None:
-    print(f"Spec path: {spec_path}")
-    command = _resolve_slash_command(spec_path, result)
-    if command:
-        print(f"Run in Codex: {command}")
-    print(f"Apply success: {result.success}")
-    _print_tests_status(result)
-    if result.git_diff:
-        print("Git diff stat:")
-        print(result.git_diff)
-    if result.stdout:
-        print("Executor stdout:")
-        print(result.stdout)
-    if result.stderr:
-        print("Executor stderr:", file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
-
-
-def _resolve_slash_command(spec_path: str, result: ExecutionResult) -> str | None:
-    metadata = result.metadata or {}
+def _resolve_slash_command(
+    spec_path: str, result: ExecutionResult | None
+) -> str | None:
+    metadata = result.metadata if result else {}
     command = metadata.get("slash_command") if isinstance(metadata, dict) else None
     if isinstance(command, str) and command.strip():
         return command.strip()
@@ -1193,11 +1169,12 @@ def _resolve_slash_command(spec_path: str, result: ExecutionResult) -> str | Non
     return None
 
 
-def _manual_execution_required(result: ExecutionResult) -> bool:
-    metadata = result.metadata or {}
-    return bool(
-        isinstance(metadata, dict) and metadata.get("manual_execution_required")
-    )
+def _print_manual_apply(plan_id: str, spec_path: str) -> None:
+    print(f"Spec path: {spec_path}")
+    command = _resolve_slash_command(spec_path, None)
+    if command:
+        print(f"Run in Codex: {command}")
+    print(f"Apply success: False (execution for plan {plan_id} not run)")
 
 
 def _print_findings(findings: list[Finding], as_json: bool) -> int:

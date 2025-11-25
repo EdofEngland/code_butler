@@ -6,11 +6,11 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from ai_clean.commands.apply import apply_plan
-from ai_clean.models import CleanupPlan, ExecutionResult
+from ai_clean.models import CleanupPlan
 
 
 class ApplyCommandTests(unittest.TestCase):
-    def test_apply_plan_records_manual_execution_and_slash_command(self) -> None:
+    def test_apply_plan_writes_spec_only_and_no_result(self) -> None:
         plan = _make_plan("plan-manual-1", intent="Touch alpha.py safely")
 
         with TemporaryDirectory() as tmp:
@@ -23,26 +23,14 @@ class ApplyCommandTests(unittest.TestCase):
             (plans_dir / f"{plan.id}.json").write_text(plan.to_json(), encoding="utf-8")
 
             with patch("ai_clean.commands.apply.ensure_on_refactor_branch"):
-                result, spec_path = apply_plan(root, config_path, plan.id)
+                spec_id, spec_path = apply_plan(root, config_path, plan.id)
 
             spec_path_obj = Path(spec_path)
             self.assertTrue(spec_path_obj.is_file())
             self.assertTrue(spec_path_obj.is_absolute())
-            slash_command = str(result.metadata.get("slash_command", ""))
-            self.assertIn("/butler-exec", slash_command)
-            self.assertIn(str(spec_path_obj), slash_command)
-            self.assertIn(str(spec_path_obj), result.stdout)
-            self.assertEqual(result.spec_id, f"{plan.id}-spec")
-            self.assertEqual(result.plan_id, plan.id)
-            self.assertFalse(result.success)
-            self.assertIsNone(result.tests_passed)
-            self.assertEqual(result.metadata.get("tests", {}).get("status"), "not_run")
-            self.assertTrue(result.metadata.get("manual_execution_required"))
-
+            self.assertEqual(spec_id, f"{plan.id}-spec")
             result_path = root / ".ai-clean" / "results" / f"{plan.id}.json"
-            self.assertTrue(result_path.is_file())
-            stored = ExecutionResult.from_json(result_path.read_text())
-            self.assertEqual(stored.metadata.get("manual_execution_required"), True)
+            self.assertFalse(result_path.exists())
 
     def test_apply_plan_aborts_when_plan_limits_exceeded(self) -> None:
         plan = _make_plan(
